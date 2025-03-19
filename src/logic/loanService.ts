@@ -1,6 +1,8 @@
 import { LoanDeposit, LoanAmount, LoanDetails, LoanPurpose } from '../types/loan';
 import { DEFAULT_UPFRONT_COSTS, DEFAULT_MAX_LVR } from '../constants/defaultValues';
 import { calculateStampDuty } from './stampDutyService';
+import { calculateDeposit } from './depositService';
+import { calculateLoanAmountRequired } from './depositService';
 
 /**
  * Calculate deposit and available funds
@@ -27,14 +29,31 @@ export const calculateLoanDeposit = (
 
 /**
  * Calculate loan amount required and LVR
+ * This is a wrapper around the deposit and loan amount calculation functions
+ * that adds the maxLvr calculation based on postcode
  */
 export const calculateLoanAmount = (
   propertyPrice: number,
-  availableForDeposit: number,
+  savings: number,
+  state: string,
+  purpose: LoanPurpose,
+  firstHomeBuyer: boolean,
   postcode: string
 ): LoanAmount => {
-  const required = Math.max(0, propertyPrice - availableForDeposit);
-  const lvr = (required / propertyPrice) * 100;
+  // Calculate deposit using depositService
+  const depositResult = calculateDeposit({
+    propertyPrice,
+    savings,
+    state: state as any, // Using any as a temporary solution
+    purpose,
+    firstHomeBuyer
+  });
+  
+  // Calculate loan amount using depositService
+  const loanAmountResult = calculateLoanAmountRequired({
+    propertyPrice,
+    availableForDeposit: depositResult.availableForDeposit
+  });
   
   // Determine max LVR based on property postcode
   let maxLvr = DEFAULT_MAX_LVR;
@@ -45,9 +64,9 @@ export const calculateLoanAmount = (
   }
   
   return {
-    required,
-    lvr,
-    maxLvr,
+    required: loanAmountResult.required,
+    lvr: loanAmountResult.lvr,
+    maxLvr
   };
 };
 
