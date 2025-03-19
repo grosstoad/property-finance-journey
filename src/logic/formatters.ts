@@ -1,5 +1,7 @@
 /**
- * Format a number as currency (AUD)
+ * Formats a number as currency with AUD symbol and thousands separators
+ * @param value - The number to format
+ * @returns Formatted currency string
  */
 export const formatCurrency = (value: number): string => {
   return new Intl.NumberFormat('en-AU', {
@@ -11,14 +13,23 @@ export const formatCurrency = (value: number): string => {
 };
 
 /**
- * Format a number as a percentage
+ * Formats a number as a percentage
+ * @param value - The number to format (0-100)
+ * @param decimalPlaces - Number of decimal places
+ * @returns Formatted percentage string
  */
-export const formatPercentage = (value: number): string => {
-  return new Intl.NumberFormat('en-AU', {
-    style: 'percent',
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  }).format(value / 100);
+export const formatPercentage = (value: number, decimalPlaces = 1): string => {
+  return `${value.toFixed(decimalPlaces)}%`;
+};
+
+/**
+ * Formats a number as a decimal with specified decimal places
+ * @param value - The number to format
+ * @param decimalPlaces - Number of decimal places
+ * @returns Formatted decimal string
+ */
+export const formatDecimal = (value: number, decimalPlaces = 2): string => {
+  return value.toFixed(decimalPlaces);
 };
 
 /**

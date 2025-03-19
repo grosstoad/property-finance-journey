@@ -7,26 +7,35 @@ import { LoanProvider } from "./contexts/LoanContext";
 import { HomePage } from "./pages/HomePage";
 import { PropTrackTestPage } from "./pages/PropTrackTestPage";
 import { PropTrackHooksPage } from "./pages/PropTrackHooksPage";
+import { DepositCalculatorPage } from "./pages/DepositCalculatorPage";
+import { NavBar } from "./components/NavBar";
+import { Box } from "@mui/material";
 
 export const App = () => {
   return (
     <ThemeProvider theme={theme}>
       <CssBaseline />
       <BrowserRouter>
-        <Routes>
-          <Route
-            path="/"
-            element={
-              <PropertyProvider>
-                <LoanProvider>
-                  <HomePage />
-                </LoanProvider>
-              </PropertyProvider>
-            }
-          />
-          <Route path="/test" element={<PropTrackTestPage />} />
-          <Route path="/hooks" element={<PropTrackHooksPage />} />
-        </Routes>
+        <Box sx={{ display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
+          <NavBar />
+          <Box sx={{ flexGrow: 1 }}>
+            <Routes>
+              <Route
+                path="/"
+                element={
+                  <PropertyProvider>
+                    <LoanProvider>
+                      <HomePage />
+                    </LoanProvider>
+                  </PropertyProvider>
+                }
+              />
+              <Route path="/test" element={<PropTrackTestPage />} />
+              <Route path="/hooks" element={<PropTrackHooksPage />} />
+              <Route path="/calculator" element={<DepositCalculatorPage />} />
+            </Routes>
+          </Box>
+        </Box>
       </BrowserRouter>
     </ThemeProvider>
   );
