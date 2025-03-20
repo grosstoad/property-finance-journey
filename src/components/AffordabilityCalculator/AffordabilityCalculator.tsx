@@ -2,7 +2,7 @@ import { Box, Card, Typography, styled } from '@mui/material';
 import { useContext, useEffect } from 'react';
 import { AffordabilityContext } from '../../contexts/AffordabilityContext';
 import { FinancialsContext } from '../../contexts/FinancialsContext';
-import { AffordabilityCalculatorProps, ImprovementScenario } from '../../types/affordability';
+import { AffordabilityCalculatorProps, ImprovementScenario } from '../../types';
 import { BorrowingPowerDisplay } from './BorrowingPowerDisplay';
 import { ImprovementSuggestions } from './ImprovementSuggestions';
 import { LoanProductCard } from '../LoanProductCard';

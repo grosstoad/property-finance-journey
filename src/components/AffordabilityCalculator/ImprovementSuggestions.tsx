@@ -9,7 +9,7 @@ import {
   Stack,
 } from '@mui/material';
 import { TrendingUp, CreditCard, AccountBalance, Savings } from '@mui/icons-material';
-import { ImprovementScenario } from '../../types/affordability';
+import type { ImprovementScenario } from '../../types';
 import { formatCurrency } from '../../logic/formatters';
 
 // Map scenario titles to appropriate icons
