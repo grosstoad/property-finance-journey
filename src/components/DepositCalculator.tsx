@@ -15,8 +15,7 @@ import {
   Button
 } from '@mui/material';
 import { SelectChangeEvent } from '@mui/material/Select';
-import { calculateDeposit } from '../logic/depositService';
-import { calculateLoanAmountRequired } from '../logic/depositService';
+import { calculateDepositDetails, calculateLoanAmountRequired } from '../logic/depositService';
 import { LoanPurpose } from '../types/loan';
 import { AustralianState } from '../types/stampDuty';
 import { INPUT_DEBOUNCE_TIME } from '../constants/defaultValues';
@@ -76,12 +75,10 @@ export const DepositCalculator: React.FC = () => {
         });
         
         // Calculate deposit
-        const depositResult = calculateDeposit({
+        const depositResult = calculateDepositDetails({
           propertyPrice,
           savings,
-          state,
-          purpose,
-          firstHomeBuyer
+          state
         });
         
         // Calculate loan amount
@@ -97,12 +94,8 @@ export const DepositCalculator: React.FC = () => {
         setLoanRequired(loanResult.required);
         setLvr(loanResult.lvr);
         
-        // Extract concession amount from stamp duty details
-        if (depositResult.stampDutyDetails) {
-          setConcessionAmount(depositResult.stampDutyDetails.breakdown.concessionAmount);
-        } else {
-          setConcessionAmount(0);
-        }
+        // No more stamp duty details in the new implementation
+        setConcessionAmount(0);
       } catch (error) {
         if (error instanceof Error) {
           setErrors(prev => ({ ...prev, calculation: error.message }));
