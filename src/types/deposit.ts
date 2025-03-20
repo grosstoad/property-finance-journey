@@ -4,30 +4,21 @@
 import { PropertyPurpose, AustralianState, StampDutyResult } from './stampDuty';
 import { LoanPurpose } from './loan';
 
-// Upfront costs configuration
-export interface UpfrontCostsConfig {
-  minAmount: number;
-  percentageOfPrice: number;
-}
-
 // Deposit calculation parameters
-export interface DepositParams {
+export interface DepositCalculationParams {
   propertyPrice: number;
   savings: number;
-  state: AustralianState;
-  purpose: LoanPurpose;
-  firstHomeBuyer: boolean;
-  upfrontCostsConfig?: UpfrontCostsConfig;
+  state: string;
 }
 
 // Deposit calculation result
-export interface DepositResult {
-  propertyPrice: number;
-  savings: number;
-  stampDuty: number;
+export interface DepositCalculationResult {
   upfrontCosts: number;
+  stampDuty: number;
   availableForDeposit: number;
-  stampDutyDetails?: StampDutyResult; // Optional details about stamp duty calculation
+  totalRequiredDeposit: number;
+  hasShortfall: boolean;
+  shortfallAmount: number;
 }
 
 // Loan amount calculation parameters

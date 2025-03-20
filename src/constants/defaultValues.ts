@@ -13,4 +13,8 @@ export const DEFAULT_UPFRONT_COSTS = 3000; // $3,000
 export const INPUT_DEBOUNCE_TIME = 500; // 500ms
 
 // Maximum LVR for property loans
-export const DEFAULT_MAX_LVR = 80; // 80% LVR 
+export const DEFAULT_MAX_LVR = 80; // 80% LVR
+
+// Loan and deposit calculation defaults
+export const DEFAULT_MIN_UPFRONT_COSTS = 1500;
+export const DEFAULT_UPFRONT_COSTS_PERCENTAGE = 0.001; // 0.1% of property price 
