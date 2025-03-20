@@ -1,21 +1,30 @@
 // Export from deposit
-export { type DepositDetails } from './deposit';
+export { 
+  type DepositCalculationParams,
+  type DepositCalculationResult,
+  type LoanAmountParams,
+  type LoanAmountResult
+} from './deposit';
 
 // Export from FinancialTypes
 export { 
-  type FinancialContextType,
-  type Financials,
-  type IncomeDetails,
-  type Liabilities,
-  type ApplicantType,
-  type FrequencyType
+  type PropertyType,
+  type LoanPurposeType,
+  type PropertyDetails,
+  type DepositDetails,
+  type FrequencyType,
+  type IncomeInput,
+  type ApplicantFinancials,
+  type LiabilitiesInput,
+  type FinancialsInput,
+  type ImprovementScenario,
+  type BorrowingConstraint
 } from './FinancialTypes';
 
 // Export from loan
 export {
   type LoanAmount,
   type LoanPurpose,
-  type LoanContextType,
   type LoanProductDetails,
   type LoanPreferences
 } from './loan';
@@ -29,8 +38,7 @@ export {
 // Export from affordability
 export { 
   type AffordabilityCalculatorProps,
-  type AffordabilityContextType,
-  type ImprovementScenario 
+  type AffordabilityContextType
 } from './affordability';
 
 // Export from property
@@ -42,6 +50,5 @@ export {
 
 // Export from proptrack
 export {
-  type PropertyAttributes,
-  type PropTrackPropertyResponse
+  type PropertyAttributes
 } from './proptrack'; 

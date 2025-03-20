@@ -51,6 +51,8 @@ export function calculateImprovementScenarios(
     scenarios.push({
       title: 'Increase savings by $20,000',
       description: 'Adding more to your deposit can increase your borrowing power',
+      potentialIncrease: 20000,
+      type: 'SAVINGS',
       impact: increasedSavings20k - currentMaxBorrowing,
       newMaxBorrowing: increasedSavings20k,
     });
@@ -67,6 +69,8 @@ export function calculateImprovementScenarios(
     scenarios.push({
       title: 'Increase savings by $50,000',
       description: 'A larger deposit significantly increases your borrowing power',
+      potentialIncrease: 50000,
+      type: 'SAVINGS',
       impact: increasedSavings50k - currentMaxBorrowing,
       newMaxBorrowing: increasedSavings50k,
     });
@@ -83,6 +87,8 @@ export function calculateImprovementScenarios(
     scenarios.push({
       title: 'Increase savings by $100,000',
       description: 'A substantial deposit boost can maximize your borrowing power',
+      potentialIncrease: 100000,
+      type: 'SAVINGS',
       impact: increasedSavings100k - currentMaxBorrowing,
       newMaxBorrowing: increasedSavings100k,
     });
@@ -127,6 +133,8 @@ export function calculateImprovementScenarios(
       scenarios.push({
         title: 'Reduce expenses to minimum',
         description: 'Lowering your living expenses can improve serviceability',
+        potentialIncrease: monthlyExpenses - monthlyHem,
+        type: 'EXPENSES',
         impact: maxLoanAmount - currentMaxBorrowing,
         newMaxBorrowing: maxLoanAmount,
       });
@@ -153,6 +161,8 @@ export function calculateImprovementScenarios(
       scenarios.push({
         title: 'Close credit cards',
         description: 'Cancelling or reducing your credit card limits can improve borrowing power',
+        potentialIncrease: financials.liabilities.creditCardLimit,
+        type: 'CREDIT',
         impact: maxLoanAmount - currentMaxBorrowing,
         newMaxBorrowing: maxLoanAmount,
       });

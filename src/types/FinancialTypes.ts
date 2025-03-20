@@ -58,6 +58,8 @@ export interface FinancialsInput {
 export interface ImprovementScenario {
   title: string;
   description: string;
+  potentialIncrease: number;
+  type: 'SAVINGS' | 'EXPENSES' | 'CREDIT' | 'INCOME';
   impact: number;
   newMaxBorrowing: number;
 }
