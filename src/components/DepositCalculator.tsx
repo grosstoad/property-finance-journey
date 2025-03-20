@@ -11,8 +11,10 @@ import {
   FormControlLabel, 
   Grid, 
   Paper, 
-  Divider 
+  Divider,
+  Button
 } from '@mui/material';
+import { SelectChangeEvent } from '@mui/material/Select';
 import { calculateDeposit } from '../logic/depositService';
 import { calculateLoanAmountRequired } from '../logic/depositService';
 import { LoanPurpose } from '../types/loan';
@@ -40,6 +42,7 @@ export const DepositCalculator: React.FC = () => {
   const [availableForDeposit, setAvailableForDeposit] = useState<number>(0);
   const [loanRequired, setLoanRequired] = useState<number>(0);
   const [lvr, setLvr] = useState<number>(0);
+  const [concessionAmount, setConcessionAmount] = useState<number>(0);
   
   // Error states
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -63,6 +66,15 @@ export const DepositCalculator: React.FC = () => {
         // Clear previous errors
         setErrors({});
         
+        // Debug log to track inputs
+        console.log('Inputs:', { 
+          propertyPrice, 
+          savings, 
+          state, 
+          purpose, 
+          firstHomeBuyer 
+        });
+        
         // Calculate deposit
         const depositResult = calculateDeposit({
           propertyPrice,
@@ -84,6 +96,13 @@ export const DepositCalculator: React.FC = () => {
         setAvailableForDeposit(depositResult.availableForDeposit);
         setLoanRequired(loanResult.required);
         setLvr(loanResult.lvr);
+        
+        // Extract concession amount from stamp duty details
+        if (depositResult.stampDutyDetails) {
+          setConcessionAmount(depositResult.stampDutyDetails.breakdown.concessionAmount);
+        } else {
+          setConcessionAmount(0);
+        }
       } catch (error) {
         if (error instanceof Error) {
           setErrors(prev => ({ ...prev, calculation: error.message }));
@@ -105,21 +124,63 @@ export const DepositCalculator: React.FC = () => {
     setSavings(isNaN(value) ? 0 : value);
   };
   
-  const handleStateChange = (e: React.ChangeEvent<{ value: unknown }>) => {
+  // Fixed type for Select event handler
+  const handleStateChange = (e: SelectChangeEvent<AustralianState>) => {
     setState(e.target.value as AustralianState);
   };
   
-  const handlePurposeChange = (e: React.ChangeEvent<{ value: unknown }>) => {
+  // Fixed type for Select event handler
+  const handlePurposeChange = (e: SelectChangeEvent<LoanPurpose>) => {
     setPurpose(e.target.value as LoanPurpose);
   };
   
   const handleFirstHomeBuyerChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    console.log('First Home Buyer toggled:', e.target.checked);
     setFirstHomeBuyer(e.target.checked);
+  };
+  
+  // Test scenario functions
+  const testNswFirstHomeBuyer = () => {
+    setPropertyPrice(550000);
+    setSavings(150000);
+    setState('NSW');
+    setPurpose('OWNER_OCCUPIED');
+    setFirstHomeBuyer(true);
+    console.log('Set NSW first home buyer test scenario');
+  };
+  
+  const testVicFirstHomeBuyer = () => {
+    setPropertyPrice(550000);
+    setSavings(150000);
+    setState('VIC');
+    setPurpose('OWNER_OCCUPIED');
+    setFirstHomeBuyer(true);
+    console.log('Set VIC first home buyer test scenario');
   };
   
   return (
     <Paper elevation={3} sx={{ p: 3, m: 2 }}>
       <Typography variant="h5" gutterBottom>Property Deposit Calculator</Typography>
+      
+      {/* Test buttons */}
+      <Box sx={{ mb: 2, display: 'flex', gap: 2 }}>
+        <Button 
+          variant="outlined" 
+          size="small" 
+          onClick={testNswFirstHomeBuyer}
+          sx={{ fontSize: '0.7rem' }}
+        >
+          Test NSW First Home Buyer
+        </Button>
+        <Button 
+          variant="outlined" 
+          size="small" 
+          onClick={testVicFirstHomeBuyer}
+          sx={{ fontSize: '0.7rem' }}
+        >
+          Test VIC First Home Buyer
+        </Button>
+      </Box>
       
       <Grid container spacing={3}>
         {/* Left column - Inputs */}
@@ -210,6 +271,24 @@ export const DepositCalculator: React.FC = () => {
                   <Typography>Stamp Duty:</Typography>
                   <Typography>{formatCurrency(stampDuty)}</Typography>
                 </Box>
+                
+                {firstHomeBuyer && purpose === 'OWNER_OCCUPIED' && (
+                  <Box sx={{ 
+                    display: 'flex', 
+                    justifyContent: 'space-between', 
+                    mb: 1,
+                    bgcolor: 'success.light',
+                    p: 1,
+                    borderRadius: 1
+                  }}>
+                    <Typography>First Home Buyer Concession:</Typography>
+                    <Typography fontWeight="bold">
+                      {concessionAmount > 0 
+                        ? `${formatCurrency(concessionAmount)} saved!` 
+                        : 'Not applicable'}
+                    </Typography>
+                  </Box>
+                )}
                 
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
                   <Typography>Upfront Costs:</Typography>

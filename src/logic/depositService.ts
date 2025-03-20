@@ -52,6 +52,9 @@ export const calculateUpfrontCosts = (
  * @throws Error if property price is negative
  */
 export const calculateDeposit = (params: DepositParams): DepositResult => {
+  // Debug log: Input parameters
+  console.log('Deposit calculation params:', params);
+  
   const { 
     propertyPrice, 
     savings, 
@@ -74,6 +77,12 @@ export const calculateDeposit = (params: DepositParams): DepositResult => {
   const stampDutyPurpose: PropertyPurpose = 
     purpose === 'OWNER_OCCUPIED' ? 'owner-occupied' : 'investment';
   
+  console.log('Mapped purpose:', { 
+    originalPurpose: purpose, 
+    stampDutyPurpose, 
+    firstHomeBuyer 
+  });
+  
   // Calculate stamp duty
   const stampDutyParams = {
     state,
@@ -83,6 +92,8 @@ export const calculateDeposit = (params: DepositParams): DepositResult => {
   };
   
   const stampDutyResult = calculateStampDuty(stampDutyParams);
+  console.log('Stamp duty result:', stampDutyResult);
+  
   const stampDuty = stampDutyResult.stampDuty;
   
   // Calculate upfront costs
@@ -91,13 +102,18 @@ export const calculateDeposit = (params: DepositParams): DepositResult => {
   // Calculate available for deposit (cannot be negative)
   const availableForDeposit = Math.max(0, savings - stampDuty - upfrontCosts);
   
-  return {
+  const result = {
     propertyPrice,
     savings,
     stampDuty,
     upfrontCosts,
-    availableForDeposit
+    availableForDeposit,
+    stampDutyDetails: stampDutyResult // Include full stamp duty calculation details
   };
+  
+  console.log('Final deposit calculation result:', result);
+  
+  return result;
 };
 
 /**

@@ -212,8 +212,18 @@ export const applyFirstHomeBuyerConcession = (
   let concessionAmount = 0;
   let finalAmount = baseStampDuty;
   
+  console.log('FHB Concession check:', { 
+    propertyPrice, 
+    baseStampDuty, 
+    firstHomeBuyer,
+    exemptionThreshold: stateData.firstHomeBuyer.exemptionThreshold,
+    concessionThreshold: stateData.firstHomeBuyer.concessionThreshold,
+    concessionRate: stateData.firstHomeBuyer.concessionRate
+  });
+  
   // If not a first home buyer, no concession applies
   if (!firstHomeBuyer) {
+    console.log('Not a first home buyer, no concession applied');
     return { concessionAmount, finalAmount };
   }
   
@@ -221,11 +231,13 @@ export const applyFirstHomeBuyerConcession = (
   
   // Apply full exemption if eligible
   if (concessionRate === 'full-exemption' && propertyPrice <= exemptionThreshold) {
+    console.log('Full exemption applied - property price under threshold');
     concessionAmount = baseStampDuty;
     finalAmount = 0;
   } 
   // Apply sliding scale concession if eligible
   else if (concessionRate === 'sliding-scale' && propertyPrice <= concessionThreshold && propertyPrice > exemptionThreshold) {
+    console.log('Sliding scale concession eligible - property price between thresholds');
     // For NSW: ((1000000 - propertyPrice) / 200000) * baseStampDuty
     // For VIC: ((750000 - propertyPrice) / 150000) * baseStampDuty
     // For WA:  ((530000 - propertyPrice) / 100000) * baseStampDuty
@@ -240,18 +252,22 @@ export const applyFirstHomeBuyerConcession = (
           // NSW formula: ((1000000 - propertyPrice) / 200000) * baseStampDuty
           if (stateData.firstHomeBuyer.concessionFormula === "((1000000 - propertyPrice) / 200000) * baseStampDuty") {
             concessionAmount = ((1000000 - propertyPrice) / 200000) * baseStampDuty;
+            console.log('Applied NSW formula', { concessionAmount });
           }
           // VIC formula: ((750000 - propertyPrice) / 150000) * baseStampDuty
           else if (stateData.firstHomeBuyer.concessionFormula === "((750000 - propertyPrice) / 150000) * baseStampDuty") {
             concessionAmount = ((750000 - propertyPrice) / 150000) * baseStampDuty;
+            console.log('Applied VIC formula', { concessionAmount });
           }
           // WA formula: ((530000 - propertyPrice) / 100000) * baseStampDuty
           else if (stateData.firstHomeBuyer.concessionFormula === "((530000 - propertyPrice) / 100000) * baseStampDuty") {
             concessionAmount = ((530000 - propertyPrice) / 100000) * baseStampDuty;
+            console.log('Applied WA formula', { concessionAmount });
           }
           // ACT formula: ((930000 - propertyPrice) / 345000) * baseStampDuty
           else if (stateData.firstHomeBuyer.concessionFormula === "((930000 - propertyPrice) / 345000) * baseStampDuty") {
             concessionAmount = ((930000 - propertyPrice) / 345000) * baseStampDuty;
+            console.log('Applied ACT formula', { concessionAmount });
           }
           
           // Ensure concession amount is not negative and not greater than base duty
@@ -259,13 +275,17 @@ export const applyFirstHomeBuyerConcession = (
           finalAmount = baseStampDuty - concessionAmount;
         } catch (error) {
           // If there's an error evaluating the formula, fall back to no concession
+          console.error('Error applying concession formula:', error);
           concessionAmount = 0;
           finalAmount = baseStampDuty;
         }
       }
     }
+  } else {
+    console.log('No concession formula applied - conditions not met');
   }
   
+  console.log('Final concession result:', { concessionAmount, finalAmount });
   return { concessionAmount, finalAmount };
 };
 
@@ -300,6 +320,8 @@ export const calculateStampDuty = (params: StampDutyParams): StampDutyResult => 
     australianResident = true 
   } = params;
   
+  console.log('Stamp duty calculation starting with params:', params);
+  
   // Validate inputs
   if (propertyPrice < 0) {
     throw new Error('Property price cannot be negative');
@@ -316,9 +338,11 @@ export const calculateStampDuty = (params: StampDutyParams): StampDutyResult => 
   
   // Calculate base stamp duty
   const baseStampDuty = calculateBaseStampDuty(propertyPrice, threshold);
+  console.log('Base stamp duty calculated:', baseStampDuty);
   
   // First home buyer concessions only apply for owner-occupied properties
   const isEligibleForFHB = purpose === 'owner-occupied' && firstHomeBuyer;
+  console.log('FHB eligibility check:', { purpose, firstHomeBuyer, isEligibleForFHB });
   
   // Apply first home buyer concession if applicable
   const { concessionAmount, finalAmount } = applyFirstHomeBuyerConcession(
@@ -338,7 +362,7 @@ export const calculateStampDuty = (params: StampDutyParams): StampDutyResult => 
   // Calculate final stamp duty including any surcharges
   const stampDuty = finalAmount + foreignSurchargeAmount;
   
-  return {
+  const result = {
     stampDuty,
     breakdown: {
       baseStampDuty,
@@ -352,4 +376,8 @@ export const calculateStampDuty = (params: StampDutyParams): StampDutyResult => 
       appliedThreshold: threshold.min
     }
   };
+  
+  console.log('Final stamp duty calculation result:', result);
+  
+  return result;
 }; 

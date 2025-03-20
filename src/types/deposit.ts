@@ -1,7 +1,7 @@
 /**
  * Types for deposit and loan amount calculations
  */
-import { PropertyPurpose, AustralianState } from './stampDuty';
+import { PropertyPurpose, AustralianState, StampDutyResult } from './stampDuty';
 import { LoanPurpose } from './loan';
 
 // Upfront costs configuration
@@ -27,6 +27,7 @@ export interface DepositResult {
   stampDuty: number;
   upfrontCosts: number;
   availableForDeposit: number;
+  stampDutyDetails?: StampDutyResult; // Optional details about stamp duty calculation
 }
 
 // Loan amount calculation parameters
