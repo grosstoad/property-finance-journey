@@ -35,16 +35,27 @@ const PropertyCard = styled(Card)(({ theme }) => ({
   boxShadow: '0px 4px 20px rgba(0, 0, 0, 0.1)',
   borderRadius: theme.shape.borderRadius,
   backgroundColor: '#ffffff',
+  minHeight: 400,
+  display: 'flex',
+  flexDirection: 'column',
+  [theme.breakpoints.down('md')]: {
+    minHeight: 'unset',
+  }
 }));
 
 const PropertyImage = styled('img')({
   width: '100%',
   height: '100%',
   objectFit: 'cover',
+  display: 'block',
 });
 
 const PropertyInfo = styled(Box)(({ theme }) => ({
   padding: theme.spacing(3),
+  height: '100%',
+  display: 'flex',
+  flexDirection: 'column',
+  justifyContent: 'center',
 }));
 
 const PropertyAddress = styled(Typography)(({ theme }) => ({
@@ -157,9 +168,9 @@ export const PropertyInsights = () => {
 
   return (
     <PropertyCard>
-      <Grid container>
+      <Grid container sx={{ height: '100%', flexGrow: 1 }}>
         {/* Left section: Property details */}
-        <Grid item xs={12} md={6}>
+        <Grid item xs={12} md={6} sx={{ height: isTablet ? 'auto' : '100%' }}>
           <PropertyInfo>
             <PropertyAddress variant="h4">{address.street}</PropertyAddress>
             <PropertySuburb variant="h6">{address.suburb} {address.state} {address.postcode}</PropertySuburb>
@@ -221,7 +232,7 @@ export const PropertyInsights = () => {
         </Grid>
         
         {/* Right section: Property image */}
-        <Grid item xs={12} md={6} style={{ height: isTablet ? 300 : 'auto' }}>
+        <Grid item xs={12} md={6} sx={{ height: isTablet ? 300 : '100%', display: 'flex' }}>
           <PropertyImage 
             src="https://images.unsplash.com/photo-1568605114967-8130f3a36994?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1470&q=80" 
             alt={address.fullAddress} 

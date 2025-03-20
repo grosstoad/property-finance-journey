@@ -1,7 +1,7 @@
 import { Box, Container, Typography, styled } from '@mui/material';
 import { PropertySearch } from '../components/PropertySearch';
 import { PropertyInsights } from '../components/PropertyInsights';
-import { LoanOptions } from '../components/LoanOptions';
+import { PropertyFinanceJourney } from '../components/PropertyFinanceJourney';
 import { useProperty } from '../contexts/PropertyContext';
 
 const PageContainer = styled(Box)(({ theme }) => ({
@@ -46,7 +46,9 @@ export const HomePage = () => {
         {selectedProperty && (
           <>
             <PropertyInsights />
-            <LoanOptions />
+            <Box sx={{ mt: 4 }}>
+              <PropertyFinanceJourney />
+            </Box>
           </>
         )}
       </Container>

@@ -1,0 +1,370 @@
+{
+  "ratesData": [
+    {
+      "Product Type": "Straight Up",
+      "Interest Rate Type": "Variable",
+      "Fixed rate term": 0,
+      "Loan purpose": "Owner Occupied",
+      "Repayment type": "Principal & Interest",
+      "LVR tier": "0-50",
+      "Interest Rate": 0.0624,
+      "Upfront fees": 0,
+      "Product Name": "Straight Up Owner P&I (LVR 0 to 50)"
+    },
+    {
+      "Product Type": "Straight Up",
+      "Interest Rate Type": "Variable",
+      "Fixed rate term": 0,
+      "Loan purpose": "Owner Occupied",
+      "Repayment type": "Principal & Interest",
+      "LVR tier": "50-60",
+      "Interest Rate": 0.0629,
+      "Upfront fees": 0,
+      "Product Name": "Straight Up Owner P&I (LVR 50+ to 60)"
+    },
+    {
+      "Product Type": "Straight Up",
+      "Interest Rate Type": "Variable",
+      "Fixed rate term": 0,
+      "Loan purpose": "Owner Occupied",
+      "Repayment type": "Principal & Interest",
+      "LVR tier": "60-70",
+      "Interest Rate": 0.0634,
+      "Upfront fees": 0,
+      "Product Name": "Straight Up Owner P&I (LVR 60+ to 70)"
+    },
+    {
+      "Product Type": "Straight Up",
+      "Interest Rate Type": "Variable",
+      "Fixed rate term": 0,
+      "Loan purpose": "Owner Occupied",
+      "Repayment type": "Principal & Interest",
+      "LVR tier": "70-80",
+      "Interest Rate": 0.0639,
+      "Upfront fees": 0,
+      "Product Name": "Straight Up Owner P&I (LVR 70+ to 80)"
+    },
+    {
+      "Product Type": "Straight Up",
+      "Interest Rate Type": "Variable",
+      "Fixed rate term": 0,
+      "Loan purpose": "Owner Occupied",
+      "Repayment type": "Interest Only",
+      "LVR tier": "0-50",
+      "Interest Rate": 0.0649,
+      "Upfront fees": 0,
+      "Product Name": "Straight Up Owner IO (LVR 0 to 50)"
+    },
+    {
+      "Product Type": "Straight Up",
+      "Interest Rate Type": "Variable",
+      "Fixed rate term": 0,
+      "Loan purpose": "Owner Occupied",
+      "Repayment type": "Interest Only",
+      "LVR tier": "50-60",
+      "Interest Rate": 0.0649,
+      "Upfront fees": 0,
+      "Product Name": "Straight Up Owner IO (LVR 50+ to 60)"
+    },
+    {
+      "Product Type": "Straight Up",
+      "Interest Rate Type": "Variable",
+      "Fixed rate term": 0,
+      "Loan purpose": "Owner Occupied",
+      "Repayment type": "Interest Only",
+      "LVR tier": "60-70",
+      "Interest Rate": 0.0649,
+      "Upfront fees": 0,
+      "Product Name": "Straight Up Owner IO (LVR 60+ to 70)"
+    },
+    {
+      "Product Type": "Straight Up",
+      "Interest Rate Type": "Variable",
+      "Fixed rate term": 0,
+      "Loan purpose": "Owner Occupied",
+      "Repayment type": "Interest Only",
+      "LVR tier": "70-80",
+      "Interest Rate": 0.0649,
+      "Upfront fees": 0,
+      "Product Name": "Straight Up Owner IO (LVR 70+ to 80)"
+    },
+    {
+      "Product Type": "Straight Up",
+      "Interest Rate Type": "Variable",
+      "Fixed rate term": 0,
+      "Loan purpose": "Investor",
+      "Repayment type": "Principal & Interest",
+      "LVR tier": "0-50",
+      "Interest Rate": 0.0634,
+      "Upfront fees": 0,
+      "Product Name": "Straight Up Investor P&I (LVR 0 to 50)"
+    },
+    {
+      "Product Type": "Straight Up",
+      "Interest Rate Type": "Variable",
+      "Fixed rate term": 0,
+      "Loan purpose": "Investor",
+      "Repayment type": "Principal & Interest",
+      "LVR tier": "50-60",
+      "Interest Rate": 0.0639,
+      "Upfront fees": 0,
+      "Product Name": "Straight Up Investor P&I (LVR 50+ to 60)"
+    },
+    {
+      "Product Type": "Straight Up",
+      "Interest Rate Type": "Variable",
+      "Fixed rate term": 0,
+      "Loan purpose": "Investor",
+      "Repayment type": "Principal & Interest",
+      "LVR tier": "60-70",
+      "Interest Rate": 0.0644,
+      "Upfront fees": 0,
+      "Product Name": "Straight Up Investor P&I (LVR 60+ to 70)"
+    },
+    {
+      "Product Type": "Straight Up",
+      "Interest Rate Type": "Variable",
+      "Fixed rate term": 0,
+      "Loan purpose": "Investor",
+      "Repayment type": "Principal & Interest",
+      "LVR tier": "70-80",
+      "Interest Rate": 0.0654,
+      "Upfront fees": 0,
+      "Product Name": "Straight Up Investor P&I (LVR 70+ to 80)"
+    },
+    {
+      "Product Type": "Power Up",
+      "Interest Rate Type": "Variable",
+      "Fixed rate term": 0,
+      "Loan purpose": "Owner Occupied",
+      "Repayment type": "Principal & Interest",
+      "LVR tier": "0-50",
+      "Interest Rate": 0.0639,
+      "Upfront fees": 0,
+      "Product Name": "Power Up Owner P&I (LVR 0 to 50)"
+    },
+    {
+      "Product Type": "Power Up",
+      "Interest Rate Type": "Variable",
+      "Fixed rate term": 0,
+      "Loan purpose": "Owner Occupied",
+      "Repayment type": "Principal & Interest",
+      "LVR tier": "50-60",
+      "Interest Rate": 0.0644,
+      "Upfront fees": 0,
+      "Product Name": "Power Up Owner P&I (LVR 50+ to 60)"
+    },
+    {
+      "Product Type": "Power Up",
+      "Interest Rate Type": "Variable",
+      "Fixed rate term": 0,
+      "Loan purpose": "Owner Occupied",
+      "Repayment type": "Principal & Interest",
+      "LVR tier": "60-70",
+      "Interest Rate": 0.0649,
+      "Upfront fees": 0,
+      "Product Name": "Power Up Owner P&I (LVR 60+ to 70)"
+    },
+    {
+      "Product Type": "Power Up",
+      "Interest Rate Type": "Variable",
+      "Fixed rate term": 0,
+      "Loan purpose": "Owner Occupied",
+      "Repayment type": "Principal & Interest",
+      "LVR tier": "70-80",
+      "Interest Rate": 0.0654,
+      "Upfront fees": 0,
+      "Product Name": "Power Up Owner P&I (LVR 70+ to 80)"
+    },
+    {
+      "Product Type": "Tailored",
+      "Interest Rate Type": "Variable",
+      "Fixed rate term": 0,
+      "Loan purpose": "Owner Occupied",
+      "Repayment type": "Principal & Interest",
+      "LVR tier": "80-85",
+      "Interest Rate": 0.0709,
+      "Upfront fees": 0.015,
+      "Product Name": "Tailored Owner P&I (LVR 80+ to 85)"
+    },
+    {
+      "Product Type": "Tailored",
+      "Interest Rate Type": "Variable",
+      "Fixed rate term": 0,
+      "Loan purpose": "Owner Occupied",
+      "Repayment type": "Interest Only",
+      "LVR tier": "80-85",
+      "Interest Rate": 0.0714,
+      "Upfront fees": 0.015,
+      "Product Name": "Tailored Owner IO (LVR 80+ to 85)"
+    },
+    {
+      "Product Type": "Tailored",
+      "Interest Rate Type": "Variable",
+      "Fixed rate term": 0,
+      "Loan purpose": "Investor",
+      "Repayment type": "Principal & Interest",
+      "LVR tier": "80-85",
+      "Interest Rate": 0.0719,
+      "Upfront fees": 0.015,
+      "Product Name": "Tailored Investor P&I (LVR 80+ to 85)"
+    },
+    {
+      "Product Type": "Tailored",
+      "Interest Rate Type": "Variable",
+      "Fixed rate term": 0,
+      "Loan purpose": "Investor",
+      "Repayment type": "Interest Only",
+      "LVR tier": "80-85",
+      "Interest Rate": 0.0724,
+      "Upfront fees": 0.015,
+      "Product Name": "Tailored Investor IO (LVR 80+ to 85)"
+    },
+    {
+      "Product Type": "Fixed",
+      "Interest Rate Type": "Fixed",
+      "Fixed rate term": 1,
+      "Loan purpose": "Owner Occupied",
+      "Repayment type": "Principal & Interest",
+      "LVR tier": "0-50",
+      "Interest Rate": 0.0684,
+      "Upfront fees": 0,
+      "Product Name": "Owner P&I Fixed 1 Yr (LVR 0 to 50)"
+    },
+    {
+      "Product Type": "Fixed",
+      "Interest Rate Type": "Fixed",
+      "Fixed rate term": 1,
+      "Loan purpose": "Owner Occupied",
+      "Repayment type": "Principal & Interest",
+      "LVR tier": "50-60",
+      "Interest Rate": 0.0689,
+      "Upfront fees": 0,
+      "Product Name": "Owner P&I Fixed 1 Yr (LVR 50+ to 60)"
+    },
+    {
+      "Product Type": "Fixed",
+      "Interest Rate Type": "Fixed",
+      "Fixed rate term": 1,
+      "Loan purpose": "Owner Occupied",
+      "Repayment type": "Principal & Interest",
+      "LVR tier": "60-70",
+      "Interest Rate": 0.0694,
+      "Upfront fees": 0,
+      "Product Name": "Owner P&I Fixed 1 Yr (LVR 60+ to 70)"
+    },
+    {
+      "Product Type": "Fixed",
+      "Interest Rate Type": "Fixed",
+      "Fixed rate term": 1,
+      "Loan purpose": "Owner Occupied",
+      "Repayment type": "Principal & Interest",
+      "LVR tier": "70-80",
+      "Interest Rate": 0.0699,
+      "Upfront fees": 0,
+      "Product Name": "Owner P&I Fixed 1 Yr (LVR 70+ to 80)"
+    },
+    {
+      "Product Type": "Fixed",
+      "Interest Rate Type": "Fixed",
+      "Fixed rate term": 2,
+      "Loan purpose": "Owner Occupied",
+      "Repayment type": "Principal & Interest",
+      "LVR tier": "0-50",
+      "Interest Rate": 0.0684,
+      "Upfront fees": 0,
+      "Product Name": "Owner P&I Fixed 2 Yrs (LVR 0 to 50)"
+    },
+    {
+      "Product Type": "Fixed",
+      "Interest Rate Type": "Fixed",
+      "Fixed rate term": 2,
+      "Loan purpose": "Owner Occupied",
+      "Repayment type": "Principal & Interest",
+      "LVR tier": "50-60",
+      "Interest Rate": 0.0689,
+      "Upfront fees": 0,
+      "Product Name": "Owner P&I Fixed 2 Yrs (LVR 50+ to 60)"
+    },
+    {
+      "Product Type": "Fixed",
+      "Interest Rate Type": "Fixed",
+      "Fixed rate term": 2,
+      "Loan purpose": "Owner Occupied",
+      "Repayment type": "Principal & Interest",
+      "LVR tier": "60-70",
+      "Interest Rate": 0.0694,
+      "Upfront fees": 0,
+      "Product Name": "Owner P&I Fixed 2 Yrs (LVR 60+ to 70)"
+    },
+    {
+      "Product Type": "Fixed",
+      "Interest Rate Type": "Fixed",
+      "Fixed rate term": 2,
+      "Loan purpose": "Owner Occupied",
+      "Repayment type": "Principal & Interest",
+      "LVR tier": "70-80",
+      "Interest Rate": 0.0699,
+      "Upfront fees": 0,
+      "Product Name": "Owner P&I Fixed 2 Yrs (LVR 70+ to 80)"
+    }
+  ],
+  "ownHomeProduct": {
+    "Product Type": "OwnHome",
+    "Interest Rate Type": "Variable",
+    "Fixed rate term": 0,
+    "Term": 15,
+    "Interest Rate": 0.13,
+    "Upfront fees": 0.01,
+    "Product Name": "OwnHome Co-Investment"
+  },
+  "straightUpRates": {
+    "Owner Occupied_0-50": 0.0624,
+    "Owner Occupied_50-60": 0.0629,
+    "Owner Occupied_60-70": 0.0634,
+    "Owner Occupied_70-80": 0.0639,
+    "Investor_0-50": 0.0634,
+    "Investor_50-60": 0.0639,
+    "Investor_60-70": 0.0644,
+    "Investor_70-80": 0.0654
+  },
+  "athena": {
+    "variable": {
+      "ownerOccupied": {
+        "principal": {
+          "rate": 5.45,
+          "comparison": 5.45,
+          "maxLvr": 80
+        },
+        "interest": {
+          "rate": 5.85,
+          "comparison": 5.85,
+          "maxLvr": 80
+        }
+      },
+      "investment": {
+        "principal": {
+          "rate": 5.75,
+          "comparison": 5.75,
+          "maxLvr": 80
+        },
+        "interest": {
+          "rate": 6.15,
+          "comparison": 6.15,
+          "maxLvr": 80
+        }
+      }
+    }
+  },
+  "ownhome": {
+    "variable": {
+      "ownerOccupied": {
+        "principal": {
+          "rate": 5.99,
+          "comparison": 5.99,
+          "maxLvr": 85
+        }
+      }
+    }
+  }
+} 

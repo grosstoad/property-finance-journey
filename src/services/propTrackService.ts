@@ -70,28 +70,35 @@ export class PropTrackService {
    */
   private async refreshAccessToken(): Promise<string> {
     try {
-      // Create API credentials string and encode it
-      const credentials = `${this.apiKey}:${this.apiSecret}`;
-      const encodedCredentials = btoa(credentials);
-
       // Use the proxy URL for token requests to avoid CORS
       const tokenUrl = `${this.proxyUrl}/oauth2/token`;
       
-      console.log('Requesting token via proxy:', tokenUrl);
+      console.log('PropTrack Auth Debug: Starting token refresh');
+      console.log('PropTrack Auth Debug: Using proxy URL:', tokenUrl);
       
-      // Build request for token
+      // Build request for token using client credentials grant
       const response = await fetch(tokenUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded',
-          'Authorization': `Basic ${encodedCredentials}`
+          'Accept': 'application/json'
         },
-        body: 'grant_type=client_credentials'
+        body: new URLSearchParams({
+          'grant_type': 'client_credentials',
+          'client_id': this.apiKey,
+          'client_secret': this.apiSecret
+        })
       });
 
       if (!response.ok) {
         const errorText = await response.text();
-        console.error('Token response error:', response.status, errorText);
+        console.error('PropTrack Auth Debug: Token response error:', {
+          status: response.status,
+          statusText: response.statusText,
+          headers: Object.fromEntries(response.headers.entries()),
+          errorText,
+          requestUrl: tokenUrl
+        });
         
         try {
           const errorData = JSON.parse(errorText) as PropTrackError;
@@ -101,14 +108,17 @@ export class PropTrackService {
         }
       }
 
-      const data = await response.json() as AuthResponse;
-      console.log('Token received successfully');
+      const authResponse = await response.json() as AuthResponse;
+      console.log('PropTrack Auth Debug: Token received successfully');
       
       // Set token expiry time (subtract 60 seconds for safety margin)
-      this.tokenExpiry = Date.now() + (data.expires_in - 60) * 1000;
-      return data.access_token;
+      this.tokenExpiry = Date.now() + (authResponse.expires_in - 60) * 1000;
+      return authResponse.access_token;
     } catch (error) {
-      console.error('Error refreshing PropTrack access token:', error);
+      console.error('PropTrack Auth Debug: Error refreshing token:', error);
+      if (error instanceof Error) {
+        console.error('PropTrack Auth Debug: Error stack:', error.stack);
+      }
       throw error;
     }
   }
@@ -123,6 +133,7 @@ export class PropTrackService {
     body?: any
   ): Promise<T> {
     try {
+      console.log('PropTrack API Debug: Starting API request');
       const token = await this.getAccessToken();
       
       // Always use the proxy URL for all requests
@@ -136,6 +147,10 @@ export class PropTrackService {
           }
         });
       }
+
+      console.log('PropTrack API Debug: Making request to:', url.toString());
+      console.log('PropTrack API Debug: Request method:', method);
+      console.log('PropTrack API Debug: Query params:', queryParams);
 
       const headers: HeadersInit = {
         'Accept': 'application/json',
@@ -154,17 +169,21 @@ export class PropTrackService {
 
       if (body && method === 'POST') {
         requestOptions.body = JSON.stringify(body);
+        console.log('PropTrack API Debug: Request body:', body);
       }
 
-      console.log(`Making ${method} request to ${url.toString()}`);
-      
       // Make the request
       const response = await fetch(url.toString(), requestOptions);
 
       if (!response.ok) {
         // Try to parse error response
         const errorText = await response.text();
-        console.error('API response error:', response.status, errorText);
+        console.error('PropTrack API Debug: Response error:', {
+          status: response.status,
+          statusText: response.statusText,
+          headers: Object.fromEntries(response.headers.entries()),
+          errorText
+        });
         
         try {
           const errorData = JSON.parse(errorText) as PropTrackError;
@@ -175,9 +194,14 @@ export class PropTrackService {
         }
       }
 
-      return await response.json() as T;
+      const responseData = await response.json() as T;
+      console.log('PropTrack API Debug: Request successful');
+      return responseData;
     } catch (error) {
-      console.error(`Error in PropTrack API request to ${endpoint}:`, error);
+      console.error('PropTrack API Debug: Request failed:', error);
+      if (error instanceof Error) {
+        console.error('PropTrack API Debug: Error stack:', error.stack);
+      }
       throw error;
     }
   }

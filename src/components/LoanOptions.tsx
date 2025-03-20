@@ -30,8 +30,8 @@ import {
 } from '../constants/defaultValues';
 import { LoanProductCard, OwnHomeLoanProductCard } from './LoanProductCard';
 import { ConfigureLoanModal } from './ConfigureLoanModal';
-import { useLoanProducts } from '../hooks/useLoanProducts';
-import { ATHENA_LOGO_URL } from '../constants/urls';
+import { useLoanProducts } from '../hooks';
+import { ATHENA_LOGO_URL } from '../constants';
 
 const Container = styled(Box)(({ theme }) => ({
   marginTop: theme.spacing(3),

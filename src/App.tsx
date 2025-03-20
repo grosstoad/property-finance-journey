@@ -4,6 +4,8 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { theme } from "./constants/theme";
 import { PropertyProvider } from "./contexts/PropertyContext";
 import { LoanProvider } from "./contexts/LoanContext";
+import { FinancialsProvider } from "./contexts/FinancialsContext";
+import { AffordabilityProvider } from "./contexts/AffordabilityContext";
 import { HomePage } from "./pages/HomePage";
 import { PropTrackTestPage } from "./pages/PropTrackTestPage";
 import { PropTrackHooksPage } from "./pages/PropTrackHooksPage";
@@ -25,7 +27,11 @@ export const App = () => {
                 element={
                   <PropertyProvider>
                     <LoanProvider>
-                      <HomePage />
+                      <FinancialsProvider>
+                        <AffordabilityProvider>
+                          <HomePage />
+                        </AffordabilityProvider>
+                      </FinancialsProvider>
                     </LoanProvider>
                   </PropertyProvider>
                 }

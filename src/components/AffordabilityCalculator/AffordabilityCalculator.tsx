@@ -10,8 +10,8 @@ import { calculateMaxBorrowingByDeposit } from '../../logic/calculateMaxBorrowin
 import { calculateMaxBorrowingByFinancials } from '../../logic/calculateMaxBorrowingByFinancials';
 import { formatCurrency } from '../../logic/formatters';
 import { convertToMonthly } from '../../logic/frequencyConverter';
-import { useLoanProducts } from '../../hooks/useLoanProducts';
-import { ATHENA_LOGO_URL } from '../../constants/urls';
+import { useLoanProducts } from '../../hooks';
+import { ATHENA_LOGO_URL } from '../../constants';
 
 const CardContainer = styled(Card)(({ theme }) => ({
   maxWidth: 700,
