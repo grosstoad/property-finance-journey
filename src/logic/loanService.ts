@@ -1,11 +1,14 @@
 import { LoanDeposit, LoanAmount, LoanDetails, LoanPurpose } from '../types/loan';
 import { DEFAULT_UPFRONT_COSTS, DEFAULT_MAX_LVR } from '../constants/defaultValues';
-import { calculateStampDuty } from './stampDutyService';
-import { calculateDeposit } from './depositService';
-import { calculateLoanAmountRequired } from './depositService';
+import { calculateStampDuty } from './stampDutyCalculator';
+import { calculateDepositDetails, calculateLoanAmountRequired } from './depositService';
+import { PropertyPurpose } from '../types/stampDuty';
 
 /**
  * Calculate deposit and available funds
+ * 
+ * Note: This function is maintained for backward compatibility.
+ * For new code, prefer using the depositService directly.
  */
 export const calculateLoanDeposit = (
   propertyPrice: number,
@@ -14,7 +17,19 @@ export const calculateLoanDeposit = (
   purpose: LoanPurpose,
   isFirstHomeBuyer: boolean
 ): LoanDeposit => {
-  const stampDuty = calculateStampDuty(propertyPrice, state, purpose, isFirstHomeBuyer);
+  // Map loan purpose to stamp duty purpose
+  const stampDutyPurpose: PropertyPurpose = 
+    purpose === 'OWNER_OCCUPIED' ? 'owner-occupied' : 'investment';
+  
+  // Calculate stamp duty using the new calculator
+  const stampDutyResult = calculateStampDuty({
+    state: state as any, // Using any as a temporary solution
+    propertyPrice,
+    purpose: stampDutyPurpose,
+    firstHomeBuyer: isFirstHomeBuyer
+  });
+  
+  const stampDuty = stampDutyResult.stampDuty;
   const upfrontCosts = DEFAULT_UPFRONT_COSTS;
   const availableForDeposit = Math.max(0, savings - stampDuty - upfrontCosts);
   
@@ -41,12 +56,10 @@ export const calculateLoanAmount = (
   postcode: string
 ): LoanAmount => {
   // Calculate deposit using depositService
-  const depositResult = calculateDeposit({
+  const depositResult = calculateDepositDetails({
     propertyPrice,
     savings,
-    state: state as any, // Using any as a temporary solution
-    purpose,
-    firstHomeBuyer
+    state
   });
   
   // Calculate loan amount using depositService
