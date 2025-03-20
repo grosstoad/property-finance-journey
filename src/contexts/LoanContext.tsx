@@ -1,5 +1,5 @@
 import { createContext, ReactNode, useContext, useState } from 'react';
-import { LoanDeposit, LoanAmount, LoanDetails, LoanPurpose } from '../types/loan';
+import { LoanDeposit, LoanAmount, LoanDetails, LoanPurpose, LoanPreferences, LoanProductDetails, OwnHomeProductDetails } from '../types/loan';
 
 interface LoanContextType {
   loanDeposit: LoanDeposit | null;
@@ -12,6 +12,16 @@ interface LoanContextType {
   setLoanPurpose: (purpose: LoanPurpose) => void;
   isFirstHomeBuyer: boolean;
   setIsFirstHomeBuyer: (isFirstHomeBuyer: boolean) => void;
+  loanPreferences: LoanPreferences;
+  setLoanPreferences: (preferences: LoanPreferences) => void;
+  loanProductDetails: {
+    athenaProduct: LoanProductDetails | null;
+    ownHomeProduct?: OwnHomeProductDetails | null;
+  };
+  setLoanProductDetails: (details: {
+    athenaProduct: LoanProductDetails | null;
+    ownHomeProduct?: OwnHomeProductDetails | null;
+  }) => void;
 }
 
 const LoanContext = createContext<LoanContextType | undefined>(undefined);
@@ -26,6 +36,18 @@ export const LoanProvider = ({ children }: LoanProviderProps) => {
   const [loanDetails, setLoanDetails] = useState<LoanDetails | null>(null);
   const [loanPurpose, setLoanPurpose] = useState<LoanPurpose>('OWNER_OCCUPIED');
   const [isFirstHomeBuyer, setIsFirstHomeBuyer] = useState<boolean>(false);
+  const [loanPreferences, setLoanPreferences] = useState<LoanPreferences>({
+    interestRateType: 'VARIABLE',
+    repaymentType: 'PRINCIPAL_AND_INTEREST',
+    loanFeatureType: 'redraw',
+    loanTerm: 30
+  });
+  const [loanProductDetails, setLoanProductDetails] = useState<{
+    athenaProduct: LoanProductDetails | null;
+    ownHomeProduct?: OwnHomeProductDetails | null;
+  }>({
+    athenaProduct: null
+  });
 
   const value = {
     loanDeposit,
@@ -38,6 +60,10 @@ export const LoanProvider = ({ children }: LoanProviderProps) => {
     setLoanPurpose,
     isFirstHomeBuyer,
     setIsFirstHomeBuyer,
+    loanPreferences,
+    setLoanPreferences,
+    loanProductDetails,
+    setLoanProductDetails
   };
 
   return (

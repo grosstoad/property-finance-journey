@@ -14,12 +14,12 @@ export const formatCurrency = (value: number): string => {
 
 /**
  * Formats a number as a percentage
- * @param value - The number to format (0-100)
+ * @param value - The number to format (as decimal, e.g. 0.0649 for 6.49%)
  * @param decimalPlaces - Number of decimal places
  * @returns Formatted percentage string
  */
-export const formatPercentage = (value: number, decimalPlaces = 1): string => {
-  return `${value.toFixed(decimalPlaces)}%`;
+export const formatPercentage = (value: number, decimalPlaces = 2): string => {
+  return `${(value * 100).toFixed(decimalPlaces)}%`;
 };
 
 /**
