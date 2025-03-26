@@ -1,0 +1,277 @@
+# MaxBorrow Logic
+
+v2
+
+Your goal is to calculate the maximum loan amount based on the borrowers situation
+
+This is done by taking
+
+- MIN (**MaxBorrowFinancials**, **MaxBorrowDeposit**, **GlobalLoanMax**)
+    - Always stamp the value that has derived the MIN e.g. maxBorrowReason
+    - There is only one value for globalLoanMax
+    - For maxBorrowFinancials use the maxLoanAmount where lvrBandMatchFlag is TRUE
+        - Stamp the used version as maxBorrowingAmountFinancialsUsed with the LVR band (e.g. maxBorrowingAmountFinancials_70_80)
+    - For **MaxBorrowDeposit use based on the loan amount required scenario**
+        - Stamp the used version as **MaxBorrowingAmountDepositUsed**, which is selected based on the **loanAmountRequiredScenario**:
+            - **SU/PU/Fixed ≤80%:** Use **MaxBorrowingAmountDeposit_70_80**
+            - **Tailored 80–85%:** Use **MaxBorrowingAmountDeposit_80_85**
+            - **Combined solution with OwnHome:** Use **MaxBorrowingAmountDeposit_70_80**
+
+### **GlobalLoanMax**
+
+- This is a constant of 3,000,000
+
+### **MaxBorrowFinancials calculation logic**
+
+- You will generate MaxBorrowFinancials for
+    - 0-50%
+    - 50-60%
+    - 60-70%
+    - 70-80%
+    - 80-85%
+- The version you use will be where the LVR band for the calculated LVR is equal to the LVR band (as in within the range)
+- The calculated LVR is the max loan amount / max property value derived from the LVR band calculations
+
+**Calculation steps**
+
+- Calculate serviceability to generate a surplus with no new loan passed through
+- The surplus value represents the buffered repayments
+- For every maxBorrowFinancials LVR band
+    - Look up the relevant product with the provided loan inputs (e.g. loan term, interest only term, LVR band, loan feature type) to get the rate (the rate lookup provides 0.0634 as representative of 6.34%)
+        - if the loan amount required scenario is SU PU Fixed or OwnHome combined then use Tailored as the 80-85% scenario
+        - If the loan amount required scenario is Tailored then use the Straight Up product for 0-50, 50-60, 60-70, 70-80% LVR band scenarios
+    - Use the buffer constant which should already exist
+    - Calculate using PV formula the max loan amount. This represents the max loan amount for a given LVR band for MaxBorrowFinancials
+        - For Investor purpose loans we need to factor in the deductible interest benefit. So we pass the loan back into the servicing calculation to generate a new surplus (where the serviceability rules will factor in the interest deduction to generate a positive surplus). That new surplus then results in iterating on another loan amount to generate a surplus of $0. Always use the PV formula as the initial guess for investor purpose loans
+        - The tolerance level is $10 for the surplus amount to stop the calculation
+        - For owner occupied loans run the max loan amount through serviceability with the same loan inputs to generate surplus amount. this is to help check if it’s accurate. ideally it’s 0
+    - We then need to calculate the requisite maxPropertyAmount. We do this by solving for these rules which requires an iterative calculation
+        - maxPropertyAmount = maxLoan Amount + Deposit
+        - Deposit = Savings (static value provided earlier) - Stamp duty (function of property value) - upfront costs (function of property value)
+        - Note at this point the maxLoan Amount and Savings values are known
+        - Use this logic to determine you initial guess and upper and lower bound limits
+            - Upper bound = maxLoanAmount + Savings
+            - Lower bound = (maxLoanAmount + Savings) * 0.90
+            - Starting amount for iterative calculation to solve equation = (Upper bound + Lower Bound) / 2
+        - The tolerance level is $10 for the difference between the savings amount and subtracting the calculated deposit, stamp duty and upfront costs amount
+    - Generate a maxCalculatedLVR for each LVR band by taking the maxLoan Amount / maxProperty Value . Compare the maxCalculated LVR to the LvrBAND that the scenario is for to compute a lvrBandMatchFlag of TRUE or FALSE. Note I expect only one of the LVR bands for maxBorrowFinancials will be TRUE. The rest will be false.
+    - Ensure you console log these values at minimum for every LVR band scenario
+        - initial serviceability surplus
+        - initial max loan amount
+        - final max loan amount (if investor and there’s all the recalculation)
+        - investorIterations (how many times it took to generate the maxloan amount for investor - default to 0 for Owner occupied loans)
+        - maxLoanToleranceCheck - this is the output of the tolerance level from the serviceability output when running the maxloan amount for OOC or for INV the final run of the iterative calculation
+        - maxpropertyamouunt initial value
+        - maxproperty amount
+        - maxProperty amount iterations (given the iterative nature of the calculation)
+        - maxPropertyToelranceCHeck - This is the output of the check of the savings amount - calculated deposit, stampd uty and upfront costs amount for the final iteration
+        - calculatedLVR
+        - lvrBandMatchFlag which should be true or flase
+        
+
+### **MaxBorrowDeposit calculation logic**
+
+For each LVR band (0–50%, 50–60%, 60–70%, 70–80%, 80–85%) calculate the maxLoanAmount using these calculation steps
+
+**Upper Bound Estimate for Property Value**
+
+- Calculate the property value as:
+Property Value = Deposit / (1 - Upper Bound LVR)
+- Use the band's upper bound LVR (e.g., 50%, 60%, 70%, 80%, or 85%).
+
+**Lower Bound Estimate for Property Value**
+
+- Calculate the property value as:
+Property Value = Deposit / (1 - Upper Bound LVR - 0.10)
+- Use the band's upper bound LVR (e.g., 50%, 60%, 70%, 80%, or 85%).
+
+**Initial estimate value**
+
+- Use (Upper Bound Estimate + Lower Bound Estimate) / 2 as the initial estimate
+
+**Refined Deposit Calculation**
+
+- Property value = Loan amount + Deposit
+- Recalculate the deposit using: Deposit = Savings − Stamp Duty (Property Value) − Upfront Costs (Property Value)
+- The stamp duty and upfront costs are computed using the depositService functions. They are functions of the property value, hence the need for an iterative calculation
+- Guess the initial property value amount
+
+**Validation Check**
+
+- Ensure that the calculated LVR (derived from the final values of loan amount and property value) matches the band's upper bound.
+- **Note:** The rounding (to whole dollars) is applied only to the final LVR calculation.
+- The tolerance level is $10 for the difference between the savings amount and subtracting the calculated deposit, stamp duty and upfront costs amount
+
+**Output for Each LVR Band**
+
+For every deposit LVR band, provide in logs
+
+- Max loan amount
+- Max property amount
+- calculated LVR
+- Number of iteration attempts
+- savingsToleranceCheck - which is the value of the static Savings - Deposit - Stamp Duty - Upfront costs
+
+---
+
+solve for these unknowns to calculate the property value. note
+property value = loan amount + deposit
+deposit = savings - stamp duty (which is function of property value) - upfront costs (function of property value). Note the loan amount saving values are known.. We just need to make sure these equations hold.. Once you have done this you then calculate the LVR from loan amount / property value. Use this logic to determine your starting guess... Take the loan amount + savings as your upper bound. Then (loan amount + savings) * 0.90 as lower bound. The average of these two values is your starting poisition.Playback your understand of this for  max borrowing financials and your implementation plan for me to approve. ONce I approve you can execute
+
+Max borrowing power
+
+= MIN (**MaxBorrowFinancials**, **MaxBorrowDeposit**, **GlobalLoanMax**)
+
+- Where globalLoanMax = 3,000,000
+
+Calculate loan amount by PV formula
+
+- Repayments = Surplus value
+- Rate = interest rate from LVR band for that specific scenario (it will be different for each LVR band version) for the loan details. It needs to be the P&I rate so if fixed or interest only then its the reverting rate. Logic for this should already exist?
+- Buffer = same interest rate buffer for home loans used for servicing
+- Loan term = This should be the P&I term, so if interest only subtract the interest only period from the overall loan term. Logic for this should already exists?
+- Assume monthly repayments
+
+For OOC you can check if this is right by passing it through servicing and it should generate a surplus value of 0
+
+For INV, you keep passing the updated loan amount back through servicing until the surplus becomes 0 through the iterations
+
+# 1. MaxBorrowFinancials (Per LVR Band)
+
+## 1.1. Calculating the max borrow Amount
+
+### Buffered Repayment
+
+- The available serviceability surplus is used as a buffered repayment to back-solve the maximum loan amount.
+
+### Iterative Back-Solving per LVR Band
+
+- For each applicable LVR band, perform the back-solving calculation using PV formulas with the provided loan characteristics (e.g. loan term, IO term).
+- LVR Bands:
+    - 0–50%
+    - 50–60%
+    - 60–70%
+    - 70–80%
+    - 80–85%
+
+### Product Mapping for LVR Bands
+
+- For products such as **Straight Up** and **Power Up** that do not support the 80–85% band, the Tailored product's parameters should be used for that band.
+- Conversely, if the product is **Tailored**, then for the lower LVR bands (0–50%, 50–60%, 60–70%, 70–80%), use the parameters from the Straight Up product.
+
+### Investment Loan Special Case
+
+For loans where the purpose is Investment
+
+- The iterative calculation must incorporate interest tax deductibility.
+- This is handled automatically within the serviceability calculation.
+- The iteration should continue until the serviceability surplus reaches 0, with an acceptable tolerance range of $100.
+- Use PV formulas to backsolve the loan amount using the provided loan characteristics as the starting point for the iterative calculation then pass through the serviceability calculation to generate an updated surplus. This will parse any specific calculations for Investment purpose and you can then iterate again based on the generated surplus output
+
+### Termination Criterion
+
+- The iterative process concludes when the loan amount is determined such that the serviceability surplus is zero (or within $100 of zero).
+
+---
+
+loan amount…
+
+next step
+
+- 
+
+## 1.2. Post-Loan Amount Calculations
+
+After determining the maximum loan amount:
+
+### Property Value Calculation
+
+Property Value = Loan Amount + Deposit
+
+### Deposit Calculation
+
+Deposit = Savings − Stamp Duty (as a function of Property Value) − Upfront Costs (as a function of Property Value)
+
+**Note:**
+
+- The functions for Stamp Duty and Upfront Costs are available from the depositService and must be used as provided.
+- Do not modify the calculation for Upfront Costs.
+
+### LVR Calculation & Band Determination
+
+- Calculate the LVR using:
+    
+    LVR = Loan Amount / Property Value
+    
+- **Rounding:**
+    - Round down the final LVR calculation to whole dollars only.
+    - Determine the appropriate LVR band based on the calculated LVR.
+- **Matching Flag:**
+    - Compare the calculated LVR band against the target band:
+        - **TRUE:** if they match.
+        - **FALSE:** if they do not.
+    - This matching flag is then used to compare against the requisite maximum borrow deposit and goal max in order to determine the final max borrow amount.
+
+### Output for Each LVR Band
+
+For every LVR band, provide in logs
+
+- Max loan amount
+- Max property amount
+- Calculated LVR (final rounded value)
+- Calculated LVR band
+- Matching LVR band flag (TRUE or FALSE)
+- Investment purpose flag
+- Number of iteration attempts (expect this to be 0 if owner occupied purpose)
+- Surplus
+
+---
+
+# 2. MaxBorrowDeposit (Per LVR Band)
+
+For each LVR band (0–50%, 50–60%, 60–70%, 70–80%, 80–85%):
+
+### 1. Upper Bound Estimate for Property Value
+
+- Calculate the property value as:
+Property Value = Deposit / (1 - Upper Bound LVR)
+- Use the band's upper bound LVR (e.g., 50%, 60%, 70%, 80%, or 85%).
+
+### 2. Refined Deposit Calculation
+
+- Recalculate the deposit using:
+Deposit = Savings − Stamp Duty (Property Value) − Upfront Costs (Property Value)
+- The stamp duty and upfront costs are computed using the depositService functions. They are functions of the property value, hence the need for an iterative calculation
+
+### 3. Validation Check
+
+- Ensure that the calculated LVR (derived from the final values of loan amount and property value) matches the band's upper bound.
+- **Note:** The rounding (to whole dollars) is applied only to the final LVR calculation.
+
+### 4. Iteration Bounds for Property Value
+
+- **Upper Limit:**
+Property Value = Savings / (1 - Upper Bound LVR)
+- **Lower Limit:**
+Property Value = Savings / (1 - (Upper Bound LVR - 0.10))
+- Starting position for iterations can be the average of these two values.
+- **Configurability:**
+The lower bound adjustment (0.10) should be configurable based on market conditions, even though it is not expected to change frequently.
+
+### Output for Each LVR Band
+
+For every deposit LVR band, provide in logs
+
+- Max loan amount
+- Max property amount
+- Number of iteration attempts
+- Value of Savings - Deposit - Stamp Duty - Upfront costs (which should be 0 to prove that the iteration is complete)
+
+---
+
+## Known Assumptions
+
+- The iterative serviceability calculation handles the incorporation of interest tax deductibility automatically for investment loans.
+- The iteration termination tolerance is set at a $100 surplus difference.
+- Stamp Duty and Upfront Costs functions are provided by the depositService and must be used without modification.
+- The product mapping rules ensure that for missing LVR bands or when using a Tailored product, the appropriate product parameters (either Tailored or Straight Up) are applied accordingly.

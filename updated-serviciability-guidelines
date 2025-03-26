@@ -1,0 +1,437 @@
+# Complete Serviceability & Max Borrowing Calculation Specification
+
+This document defines every aspect of the serviceability calculation engine, max borrowing power calculations and the UI layout. It covers the evaluation of whether the required loan amounts are serviceable, the iterative determination of maximum borrowing based on both financials and deposit constraints, and the generation of affordability improvement suggestions. All calculations, iterations, rounding rules, and user interface behaviors are described in detail. This specification is intended to be unambiguous and testable (e.g. against Excel models) and is critical to ensure robustness and correctness.
+
+---
+
+## 1. Use Cases
+
+### 1.1. Loan Amount Feasibility Evaluation
+
+- **Purpose:**
+Assess whether each requested loan (there may be one or two) is serviceable.
+- **Procedure:**
+    - For each value in **loanAmountRequired**:
+        - Compute **netSurplusOrDeficit** (see Section 3.6 for its formula).
+        - **Condition:** The net surplus must be strictly greater than 0 (i.e. `netSurplusOrDeficit > 0`).
+        - **Output:**
+            - Set a Boolean flag **loanAmountRequiredMet** to **TRUE** if the condition is met; otherwise, **FALSE**.
+
+### 1.2. Maximum Borrowing Amount – Financials Calculation
+
+- **Purpose:**
+Determine the maximum borrowing amount based on the borrower's financials.
+- **Procedure:**
+    - For a single new loan, iterate on **loanAmount** until **netSurplusOrDeficit** equals exactly 0 (after rounding down to whole dollars).
+    - Iteration is performed using different interest rates corresponding to each Loan-to-Value Ratio (LVR) band.
+    - **Performance Requirement:** The iterative algorithm (e.g. a binary search or similarly efficient method) must return results nearly instantaneously.
+
+---
+
+## 2. Input Fields
+
+### 2.1. About You
+
+- **Number of Applicants:**
+    - Must be either 1 or 2.
+- **Number of Dependents:**
+    - An integer between 0 and 10.
+
+### 2.2. Income
+
+- **Frequency Options:**
+    - Weekly, Fortnightly, Monthly, Annual.
+- **Defaults:**
+    - All income types default to **annual**, except **Rental Income** (which defaults to weekly).
+- **Categories (Captured Separately for Each Applicant):**
+    - Base Income
+    - Supplementary Income
+    - Other Income
+    - Rental Income
+
+### 2.3. Expenses
+
+- **Frequency Options:**
+    - Weekly, Fortnightly, Monthly, Annual for all items except the Credit Card Limit.
+- **Joint Capture (When 2 Applicants):**
+    - Expenses, Home Loan Repayments, Other Loan Repayments, and Credit Card Limit are recorded jointly.
+
+---
+
+## 3. Calculation Logic
+
+### 3.1. New Loans Processing
+
+### 3.1.1. New Loan Input Fields
+
+For each new loan record (note that multiple new loans may be passed through the service):
+
+- **loanAmount:**
+    - Principal amount for the new loan.
+- **interestRateOngoing:**
+    - The variable principal & interest rate expressed as a decimal (e.g. 0.0536 for 5.36%).
+- **loanTerm:**
+    - Overall loan term in years (must be at least 10 years).
+- **interestOnlyPeriod:**
+    - Interest-only period in years (0 if not applicable).
+- **negativeGearingPercentage:**
+    - The percentage of the loan amount eligible for a tax deduction.
+        - **Rule:** Use 100% for investment loans; 0% for owner occupier loans.
+
+### 3.1.2. Negative Gearing Calculation
+
+- **Step 1:**
+Compute the **principal-and-interest term** as:`principalAndInterestTerm = loanTerm - interestOnlyPeriod`
+- **Step 2:**
+Calculate the cumulative interest over a 5‑year period (using a standard Principal & Interest formula with monthly compounding) based on **principalAndInterestTerm** and **interestRateOngoing**.
+- **Step 3:**
+Determine the average annual interest over these 5 years.
+    - For the first new loan, assign this value to **newLoanOneInterestDeduction**.
+    - For subsequent loans, label them sequentially (e.g. **newLoanTwoInterestDeduction**, etc.).
+- **Step 4:**
+Sum all individual interest deductions into **newLoansInterestDeduction**.
+
+### 3.1.3. Buffered Repayments Calculation
+
+- **Step 1:**
+Compute the adjusted interest rate:`bufferedRate = interestRateOngoing + newLoanBuffer`
+    - **newLoanBuffer:** A configurable constant set to 0.02 (i.e. adding 2%).
+- **Step 2:**
+Calculate the monthly repayment using the annuity formula over the **principalAndInterestTerm**.
+- **Step 3:**
+Annualise the repayment by multiplying the monthly repayment by 12.
+- **Outputs:**
+    - For the first loan, record as **newLoanOneBufferedRepayments**; for additional loans, use sequential labels.
+    - Sum all these values to obtain **newLoansBufferedRepayments**.
+
+---
+
+### 3.2. Income Calculations
+
+### 3.2.1. Gross Income Calculation
+
+- **Process:**
+    - Convert each income value to an annual figure based on its frequency.
+- **Outputs:**
+    - For each applicant: **applicantOneGrossIncome** (and **applicantTwoGrossIncome** if applicable).
+    - Sum these to form **householdGrossIncome**.
+
+### 3.2.2. Gross Shaded Income Calculation
+
+- **Process:**
+    - Multiply each annualised income by its shading factor (for example: Base Income × 1.00, Supplementary Income × 0.90).
+- **Outputs:**
+    - For each applicant: **applicantOneGrossShadedIncome** (and **applicantTwoGrossShadedIncome**).
+    - Sum to yield **householdGrossShadedIncome**.
+
+### 3.2.3. Gearing Income for Tax and HEM
+
+- **Calculation:**
+    - For one applicant:`applicantOneGrossShadedGearingIncome = applicantOneGrossShadedIncome - newLoansInterestDeduction`
+    - For two applicants:
+        - `applicantOneGrossShadedGearingIncome = applicantOneGrossShadedIncome - (newLoansInterestDeduction / 2)`
+        - `applicantTwoGrossShadedGearingIncome = applicantTwoGrossShadedIncome - (newLoansInterestDeduction / 2)`
+- **Note:**
+Future scope may allow for non‑50/50 splits based on different ownership percentages.
+
+---
+
+### 3.3. HEM and Serviceability Expenses
+
+### 3.3.1. HEM Lookup
+
+- **Inputs:**
+    - **locationID:** Derived from the property postcode.
+    - **Number of Applicants:** 1 or 2.
+    - **Marital Status:** Defaults to “married/defacto” if 2 applicants; “single” if 1 applicant.
+    - **incomeID:** Determined by comparing **householdGrossShadedIncome** against predefined income ranges.
+- **Output:**
+    - Retrieve the HEM value used for calculating serviceability expenses.
+
+### 3.3.2. Serviceability Expenses Calculation
+
+- **Process:**
+    - Compare the inputted total expenses (converted to an annual figure) against the HEM lookup value.
+    - **Rule:** Use the higher value between the two.
+- **Outputs:**
+    - **serviceabilityExpenses:** The expense value used in the serviceability calculation.
+    - **usedHEMFlag:** A flag recording which value was used (input expenses or HEM).
+
+---
+
+### 3.4. Tax and Net Income Calculations
+
+### 3.4.1. Tax Calculation
+
+- **Inputs:**
+    - **applicantOneGrossShadedGearingIncome** and, if applicable, **applicantTwoGrossShadedGearingIncome**.
+- **Procedure:**
+    - For each applicant, identify the correct tax bracket based on the following tables:
+    
+    **Income Tax Table:**
+    
+    | Low Bound | High Bound | Rate | Base |
+    | --- | --- | --- | --- |
+    | $0.00 | $18,200.00 | 0% | $0.00 |
+    | $18,200.00 | $45,000.00 | 16% | $0.00 |
+    | $45,000.00 | $135,000.00 | 30% | $4,288.00 |
+    | $135,000.00 | $190,000.00 | 37% | $31,288.00 |
+    | $190,000.00 | $999,999,999.00 | 45% | $51,638.00 |
+    
+    **Low Income Tax Offset Table:**
+    
+    | Low Bound | High Bound | Rate | Base |
+    | --- | --- | --- | --- |
+    | $0.00 | $37,500.00 | 0% | $700.00 |
+    | $37,500.00 | $45,000.00 | 5% | $700.00 |
+    | $45,000.00 | $66,667.00 | 2% | $325.00 |
+    | $66,667.00 | $999,999,999.00 | 0% | $0.00 |
+    
+    **Medicare Levy Table:**
+    
+    | Low Bound | High Bound | Rate | Base |
+    | --- | --- | --- | --- |
+    | $0.00 | $24,276.00 | 0% | $0.00 |
+    | $24,277.00 | $30,345.00 | 10% | $0.00 |
+    | $30,346.00 | $999,999,999.00 | 2% | $606.90 |
+    - For each applicant, calculate:
+        - **IncomeTax** = Base + Rate × (Income – LowerBound) for the applicable bracket.
+        - **LowIncomeTaxOffset** and **MedicareLevy** similarly.
+        - Final tax:`applicantTax = MAX(0, IncomeTax - LowIncomeTaxOffset + MedicareLevy)`
+    - **Rounding:** Round all tax figures, offsets, and levies to two decimal places.
+- **Outputs:**
+    - For each applicant:
+        - **applicantOneIncomeTax** (and **applicantTwoIncomeTax** if applicable)
+        - **applicantOneLowIncomeTaxOffset**, **applicantTwoLowIncomeTaxOffset**
+        - **applicantOneMedicareLevy**, **applicantTwoMedicareLevy**
+        - **applicantOneTax**, **applicantTwoTax**
+
+### 3.4.2. Net Income Calculation
+
+- **For Each Applicant:**
+    - `applicantNetIncome = GrossShadedGearingIncome - applicantTax`
+- **Household Net Income:**
+    - For one applicant: **householdNetIncome = applicantOneNetIncome**
+    - For two applicants: **householdNetIncome = applicantOneNetIncome + applicantTwoNetIncome**
+
+---
+
+### 3.5. Buffered Liabilities Calculation
+
+- **Components:**
+    - **Buffered Home Loan Repayments:**
+        - `bufferedHomeLoanRepayments = Home Loan Repayments × 1.3`
+    - **Buffered Other Loan Repayments:**
+        - `bufferedOtherLoanRepayments = Other Loan Repayments × 1.0`
+    - **Buffered Credit Card Repayments:**
+        - Compute monthly repayment: `Credit Card Limit × 0.038`
+        - Annualise: Multiply by 12 to obtain **bufferedCreditCardRepayments**.
+- **Total:**
+    - `bufferedLiabilities = bufferedHomeLoanRepayments + bufferedOtherLoanRepayments + bufferedCreditCardRepayments`
+
+---
+
+### 3.6. Net Surplus or Deficit Calculation
+
+- **Formula:**`netSurplusOrDeficit = householdNetIncome - (bufferedLiabilities + serviceabilityExpenses + newLoansBufferedRepayments)`
+- **Usage:**
+    - This value is the target for iteration (it must equal exactly 0 when calculating maximum borrowing amounts, with loan amounts rounded down to the nearest whole dollar).
+
+---
+
+## 4. Maximum Borrowing Amount Calculation
+
+### 4.1. Overall Maximum Borrowing Amount
+
+- **Definition:**`MaxBorrowAmount` is the minimum of:
+    - **MaxBorrowingAmountFinancials**
+    - **MaxBorrowingAmountDeposit**
+    - A global maximum constant of $3,000,000
+- **Logging:**
+    - Record the limiting value’s source in **maxBorrowAmountReason** (possible values: *MaxBorrowingAmountFinancials*, *MaxBorrowingAmountDeposit*, or *GlobalMax*).
+
+### 4.2. Maximum Borrowing Amount – Financials
+
+### 4.2.1. Iterative Calculation (Financials)
+
+- **Procedure:**
+    - For a single new loan, iterate on **loanAmount** until **netSurplusOrDeficit** equals exactly 0.
+    - **Precision:**
+        - Display the resulting loan amount as whole dollars (rounded down).
+    - Use an efficient iterative algorithm (binary search or equivalent).
+
+### 4.2.2. LVR Bands and Scenario-Specific Outputs
+
+- **Defined LVR Bands:**
+    - 0–50%
+    - 50–60%
+    - 60–70%
+    - 70–80%
+    - 80–85%
+    - **Note:** For the 80–85% band, always use Tailored product rates (even if Fixed, Straight Up, or Power Up is selected).
+- **For Each Band:**
+    1. **Property Value Calculation:**
+        - `PropertyValue = LoanAmount + Deposit`
+    2. **Deposit Calculation:**
+        - `Deposit = Savings - StampDuty(PropertyValue) - UpfrontCosts(PropertyValue)`
+            - Use the existing **depositService**.
+    3. **LVR Calculation:**
+        - `LVR = LoanAmount / PropertyValue`
+            - **Rounding:** Both LoanAmount and PropertyValue are rounded down to the nearest dollar.
+    4. **Validation:**
+        - Ensure the calculated LVR is within (and does not exceed) the defined band’s upper bound.
+- **Outputs:**
+    - Provide fields such as **MaxBorrowingAmountFinancials_0_50**, **MaxBorrowingAmountFinancials_50_60**, etc.
+    - For the version that meets the criteria, stamp the field **MaxBorrowingAmountFinancialsUsed** (for example, “MaxBorrowingAmountFinancials_70_80”).
+
+### 4.3. Maximum Borrowing Amount – Deposit
+
+### 4.3.1. Iterative Calculation (Deposit)
+
+- **Procedure:**
+    - For each LVR band (0–50, 50–60, 60–70, 70–80, 80–85):
+        1. **Solve for Property Value:**
+            - `PropertyValue = Deposit / (1 - LVR)`
+                - Use the band’s upper bound for LVR.
+        2. **Deposit Calculation:**
+            - `Deposit = Savings - StampDuty(PropertyValue) - UpfrontCosts(PropertyValue)`
+                - Again, use **depositService**.
+        3. **Validation:**
+            - Ensure the calculated LVR (with values rounded down to whole dollars) matches the band’s upper bound.
+- **Outputs:**
+    - Fields such as **MaxBorrowingAmountDeposit_0_50**, **MaxBorrowingAmountDeposit_50_60**, …, **MaxBorrowingAmountDeposit_80_85**.
+    - **Note:** The field **MaxBorrowingAmountDeposit_80_85** will always be the higher value.
+    - Stamp the used version as **MaxBorrowingAmountDepositUsed**, which is selected based on the **loanAmountRequiredScenario**:
+        - **SU/PU/Fixed ≤80%:** Use **MaxBorrowingAmountDeposit_70_80**
+        - **Tailored 80–85%:** Use **MaxBorrowingAmountDeposit_80_85**
+        - **Combined solution with OwnHome:** Use **MaxBorrowingAmountDeposit_70_80**
+
+### 4.3.2. Loan Amount Required Scenarios and Outcome
+
+- **Scenarios:**
+    - **SU/PU/Fixed <80%:**
+        - If **MaxBorrowAmount** ≥ loanAmountRequired, include **MaxBorrowingAmountDeposit_70_80** in the evaluation.
+        - If **MaxBorrowAmount** < loanAmountRequired, then affordability improvement suggestions may offer the Tailored (80–85%) option.
+    - **Tailored 80–85%:**
+        - Always use **MaxBorrowingAmountDeposit_80_85**.
+    - **Combined solution with OwnHome:**
+        - Use **MaxBorrowingAmountDeposit_70_80**.
+
+---
+
+## 5. Affordability Improvement Suggestions
+
+### 5.1. Trigger Condition
+
+- **When to Display:**
+    - Suggestions are only shown if **loanAmountRequired** is greater than **maxBorrowAmount**.
+
+### 5.2. Suggestion Logic Based on maxBorrowAmountReason and loanAmountRequiredScenario
+
+- **If maxBorrowAmountReason is GlobalMax ($3,000,000):**
+    - Do not show any suggestions; instead, display an informational message:
+    “$3,000,000 is the maximum amount we lend to a property at Athena.”
+- **If maxBorrowAmountReason is MaxBorrowingAmountFinancials:**
+    - If Expenses > HEM, display the suggestion: “Reduce expenses to minimum.”
+    - If Credit Card Limit > 0, display: “Close credit cards.”
+    - If the version used is not **MaxBorrowingAmountFinancials_0_50**, provide a **MaxBorrowingAmountDepositOption** that explains that an increase in savings might allow the use of a lower LVR band (which in turn increases the maximum borrowing amount).
+        - **Logic for Displaying Savings Increase:**
+            - Run parallel iterations of the serviceability and max borrowing calculations for incremental increases in savings (for example, +$20,000, +$50,000, +$100,000).
+            - For each increment, calculate the new max borrowing amount and property value.
+            - Present these results as suggestions indicating the additional savings required and the corresponding increase in borrowing capacity.
+- **If maxBorrowAmountReason is MaxBorrowingAmountDeposit:**
+    - Provide fixed savings increase options:
+        - Increase savings by $20,000
+        - Increase savings by $50,000
+        - Increase savings by $100,000
+
+### 5.3. Parallel Scenario Analysis & State Updates
+
+- **Initial Calculation:**
+    - Upon running the serviceability and max borrowing calculations, generate an array called **affordabilityScenarioReasons** that lists each affordability improvement suggestion along with:
+        - The additional savings required.
+        - The resulting increase in max borrowing amount.
+        - The updated property value.
+- **User Interaction:**
+    - If the user selects any suggestion:
+        - Update **maxBorrowAmount** accordingly.
+        - Set a state flag: **affordabilityScenarioUsed = TRUE**.
+        - Record the applied suggestions in an array **affordabilityScenarioReasonsUsed**.
+    - **UI Implementation Options:**
+        1. **Inline Update:**
+            - Selecting a suggestion updates the state; if the updated max borrowing exceeds the loanAmountRequired, suggestions disappear. Otherwise, the updated affordability suggestions are re‐evaluated and displayed.
+        2. **Overlay Mode:**
+            - Present an overlay where multiple selections are allowed, and the relevant dollar amounts are updated dynamically.
+            - The UI must clearly indicate that scenario analysis is in effect, while the core affordability state (i.e. whether the loan is affordable) is maintained.
+
+---
+
+## 6. User Interface (UI) Requirements
+
+### 6.1. Customer-Friendly Messaging
+
+- **Display Message:**
+    - **If loanAmountRequiredMet is TRUE:**
+    “Yes we can lend you the loan amount needed for this property. Your overall maximum borrowing amount is up to $XXX, which is $YY more than the amount you need for this property.”
+    - **If loanAmountRequiredMet is FALSE:**
+    “We may be able to lend you up to $XXX, which is lower than the $ZZZ you need for the property.”
+
+### 6.2. Loan Slider Component
+
+- **Slider Settings:**
+    - **Minimum:** $100,000.
+    - **Maximum:** Equal to **maxBorrowAmount**.
+    - **Default Value:**
+        - If **loanAmountRequiredMet** is TRUE, default to **loanAmountRequired**.
+        - If FALSE, default to **maxBorrowAmount**.
+- **Slider Output:**
+    - As the slider moves, update the following in real time:
+        - **selectedLoanAmount**
+        - Interest rate, monthly repayment, and fees.
+            - These values will be prefixed with selected. Use existing functions to recalculate
+        - Property value breakdown:
+            - Calculated **selectedPropertyValue**
+            - Savings/deposit breakdown (deposit, stamp duty, upfront costs)
+                - There will be calculated again based on the selectedPropertyValue, these values will be prefixed with selected
+            - Computed LVR (**selectedLVR**)
+- **Product Display:**
+    - For each loan product, show:
+        - Brand image, product name, and loan amount.
+        - Interest rate and monthly repayment.
+        - Disclosure of applicable fees.
+    - If the OwnHome product is part of the solution (i.e. for the combined solution scenario), display a second product component with the same details.
+
+### 6.2. Affordability Improvement Suggestions
+
+- As per 5.2. Suggestion Logic Based on maxBorrowAmountReason and loanAmountRequiredScenario, render cards based on the logic for someone to interact with
+- Make sure it includes text that outlines the amount of the change (e.g. reduced expenses by $300 to the minimum, reduce credit card limits by $10,000, increase savings by $10,000 to $410,000) and the amount it will increase borrowing power by
+
+---
+
+## 7. Configuration & Rounding
+
+### 7.1. Constants (Stored in a Configurable Constants File)
+
+- **newLoanBuffer:** 0.02
+- **Home Loan Buffering Factor:** 1.3
+- **Other Loan Buffering Factor:** 1.0
+- **Credit Card Repayment Factor:** 0.038
+- **Global Maximum Borrowing Amount:** $3,000,000
+
+### 7.2. Rounding Rules
+
+- **Loan Amount & Property Value:**
+    - Round down to the nearest whole dollar.
+- **Tax Calculations (Income Tax, Offsets, Medicare Levy):**
+    - Round to two decimal places.
+
+---
+
+## 8. Logging and Audit Trail
+
+- **Mandatory Logging:**
+    - Log all input values (personal details, income, expenses, loan details).
+    - Record intermediate results (gross income, shaded income, tax breakdown, buffered repayments, netSurplusOrDeficit).
+    - Capture decision flags (e.g. **loanAmountRequiredMet**, LVR validity flags).
+    - Log the chosen **maxBorrowAmount** and the associated reason in **maxBorrowAmountReason**.
+    - Record any selected affordability improvement suggestions in **affordabilityScenarioReasonsUsed** and flag **affordabilityScenarioUsed**.

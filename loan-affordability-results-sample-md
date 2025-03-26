@@ -1,0 +1,467 @@
+```j
+"use client"
+
+import type React from "react"
+import { useState } from "react"
+import { Box, Card, CardContent, Grid, Slider, Typography, Alert, AlertTitle, Divider } from "@mui/material"
+import CheckCircleIcon from "@mui/icons-material/CheckCircle"
+import InfoIcon from "@mui/icons-material/Info"
+import ArrowUpwardIcon from "@mui/icons-material/ArrowUpward"
+import SquareLoanCard from "./square-loan-card"
+import { ThemeProvider, createTheme } from "@mui/material/styles"
+
+// Define the theme with Athena's color palette
+const athenaTheme = createTheme({
+  palette: {
+    primary: {
+      main: "#4C108C", // Deep purple
+      light: "#A245EC", // Medium purple
+    },
+    secondary: {
+      main: "#E30088", // Magenta pink
+      light: "#FE55A6", // Light pink
+    },
+    success: {
+      main: "#00C853", // Green
+      light: "#B9F6CA",
+    },
+    warning: {
+      main: "#FF9800", // Orange
+      light: "#FFE0B2",
+    },
+    background: {
+      default: "#FFFFFF",
+      paper: "#FFFFFF",
+    },
+    text: {
+      primary: "#260937", // Dark purple
+      secondary: "#666666",
+    },
+  },
+  typography: {
+    fontFamily: '"Roboto", "Helvetica", "Arial", sans-serif',
+    h5: {
+      fontWeight: 600,
+      fontSize: "1.1rem",
+    },
+    h6: {
+      fontWeight: 600,
+      fontSize: "1rem",
+    },
+    subtitle1: {
+      fontWeight: 500,
+      fontSize: "0.9rem",
+    },
+    body1: {
+      fontSize: "0.85rem",
+    },
+    body2: {
+      fontSize: "0.8rem",
+    },
+  },
+})
+
+interface LoanAffordabilityResultsProps {
+  propertyValue: number
+  deposit: number
+  maxLoanAmount: number
+  canAfford: boolean
+  monthlyIncome: number
+  monthlyExpenses: number
+}
+
+const LoanAffordabilityResults: React.FC<LoanAffordabilityResultsProps> = ({
+  propertyValue = 1960000,
+  deposit = 800000,
+  maxLoanAmount = 1200000,
+  canAfford = true,
+  monthlyIncome = 15000,
+  monthlyExpenses = 5000,
+}) => {
+  const [loanAmount, setLoanAmount] = useState<number>(propertyValue - deposit)
+  const maxPossibleLoan = propertyValue - deposit
+
+  const handleLoanChange = (event: Event, newValue: number | number[]) => {
+    setLoanAmount(newValue as number)
+  }
+
+  const formatCurrency = (value: number) => {
+    return new Intl.NumberFormat("en-AU", {
+      style: "currency",
+      currency: "AUD",
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0,
+    }).format(value)
+  }
+
+  const calculateLVR = () => {
+    return (loanAmount / propertyValue) * 100
+  }
+
+  const getLVRColor = () => {
+    const lvr = calculateLVR()
+    if (lvr <= 60) return "#00C853" // Green
+    if (lvr <= 80) return "#FF9800" // Orange
+    return "#E30088" // Pink
+  }
+
+  const getAffordabilityOptions = () => {
+    return [
+      {
+        title: "Extend loan term",
+        description: "Increase your loan term to 35 years",
+        impact: "+$50,000",
+        icon: <ArrowUpwardIcon sx={{ color: "#00C853" }} />,
+      },
+      {
+        title: "Add another applicant",
+        description: "Include a co-borrower's income",
+        impact: "+$150,000",
+        icon: <ArrowUpwardIcon sx={{ color: "#00C853" }} />,
+      },
+      {
+        title: "Reduce expenses",
+        description: "Lower your monthly expenses",
+        impact: "+$75,000",
+        icon: <ArrowUpwardIcon sx={{ color: "#00C853" }} />,
+      },
+    ]
+  }
+
+  return (
+    <ThemeProvider theme={athenaTheme}>
+      <Box sx={{ mt: 3, mb: 3 }}>
+        <Typography
+          variant="subtitle1"
+          sx={{
+            color: "#4C108C",
+            mb: 0.25,
+            fontSize: "0.9rem",
+            fontWeight: 600,
+          }}
+        >
+          Loan Affordability Results
+        </Typography>
+
+        {/* Affordability Info Box */}
+        <Alert
+          severity={canAfford ? "success" : "warning"}
+          icon={canAfford ? <CheckCircleIcon fontSize="inherit" /> : <InfoIcon fontSize="inherit" />}
+          sx={{
+            mb: 2,
+            borderRadius: 1,
+            "& .MuiAlert-message": {
+              width: "100%",
+            },
+          }}
+        >
+          <AlertTitle sx={{ fontWeight: 600 }}>
+            {canAfford ? "Congratulations!" : "Let's explore your options"}
+          </AlertTitle>
+          {canAfford ? (
+            <Box>
+              <Typography variant="body2">
+                Based on your financial assessment, you can afford a loan of up to {formatCurrency(maxLoanAmount)} for a
+                property value of {formatCurrency(propertyValue)}.
+              </Typography>
+            </Box>
+          ) : (
+            <Box>
+              <Typography variant="body2" sx={{ mb: 1 }}>
+                Based on your financial assessment, your maximum loan amount is {formatCurrency(maxLoanAmount)}, which
+                is less than the {formatCurrency(propertyValue - deposit)} you need.
+              </Typography>
+              <Typography variant="body2">Explore the options below to increase your borrowing power.</Typography>
+            </Box>
+          )}
+        </Alert>
+
+        {/* Loan Slider Component */}
+        <Card
+          elevation={1}
+          sx={{
+            borderRadius: 1,
+            overflow: "hidden",
+            mb: 2,
+            backgroundColor: "#ffffff",
+          }}
+        >
+          <CardContent sx={{ p: 2 }}>
+            <Typography variant="h6" sx={{ mb: 2, color: "#4C108C" }}>
+              Loan Details
+            </Typography>
+
+            <Box sx={{ mb: 3 }}>
+              <Box sx={{ display: "flex", justifyContent: "space-between", mb: 0.5 }}>
+                <Typography variant="body2" color="text.secondary">
+                  Property Value
+                </Typography>
+                <Typography variant="body1" sx={{ fontWeight: 600 }}>
+                  {formatCurrency(propertyValue)}
+                </Typography>
+              </Box>
+
+              <Box sx={{ display: "flex", justifyContent: "space-between", mb: 0.5 }}>
+                <Typography variant="body2" color="text.secondary">
+                  Your Savings
+                </Typography>
+                <Typography variant="body1" sx={{ fontWeight: 600 }}>
+                  {formatCurrency(deposit)}
+                </Typography>
+              </Box>
+
+              <Box sx={{ display: "flex", justifyContent: "space-between", mb: 0.5 }}>
+                <Typography variant="body2" color="text.secondary">
+                  Your Deposit
+                </Typography>
+                <Typography variant="body1" sx={{ fontWeight: 600 }}>
+                  {formatCurrency(deposit * 0.9)}
+                </Typography>
+              </Box>
+
+              <Box sx={{ display: "flex", justifyContent: "space-between", mb: 0.5 }}>
+                <Typography variant="body2" color="text.secondary">
+                  Stamp Duty
+                </Typography>
+                <Typography variant="body1" sx={{ fontWeight: 600 }}>
+                  {formatCurrency(propertyValue * 0.04)}
+                </Typography>
+              </Box>
+
+              <Box sx={{ display: "flex", justifyContent: "space-between", mb: 0.5 }}>
+                <Typography variant="body2" color="text.secondary">
+                  Upfront Costs
+                </Typography>
+                <Typography variant="body1" sx={{ fontWeight: 600 }}>
+                  {formatCurrency(25000)}
+                </Typography>
+              </Box>
+
+              <Divider sx={{ my: 1.5 }} />
+
+              <Box sx={{ display: "flex", justifyContent: "space-between", mb: 0.5 }}>
+                <Typography variant="body1" sx={{ fontWeight: 600 }}>
+                  Loan Amount
+                </Typography>
+                <Typography variant="h6" sx={{ fontWeight: 700, color: "#4C108C" }}>
+                  {formatCurrency(loanAmount)}
+                </Typography>
+              </Box>
+
+              {/* LVR Display - Simplified */}
+              <Box sx={{ display: "flex", justifyContent: "space-between", mb: 0.5, mt: 1 }}>
+                <Typography variant="body2" color="text.secondary">
+                  Loan to Value Ratio (LVR)
+                </Typography>
+                <Typography variant="body1" sx={{ fontWeight: 600, color: getLVRColor() }}>
+                  {calculateLVR().toFixed(1)}%
+                </Typography>
+              </Box>
+            </Box>
+
+            {/* Loan Slider with min/max labels */}
+            <Box sx={{ px: 1, mb: 3 }}>
+              <Slider
+                value={loanAmount}
+                onChange={handleLoanChange}
+                min={100000}
+                max={maxPossibleLoan}
+                step={10000}
+                aria-labelledby="loan-amount-slider"
+                sx={{
+                  color: "#4C108C",
+                  "& .MuiSlider-thumb": {
+                    height: 24,
+                    width: 24,
+                    backgroundColor: "#fff",
+                    border: "2px solid #4C108C",
+                    "&:focus, &:hover, &.Mui-active, &.Mui-focusVisible": {
+                      boxShadow: "0 0 0 8px rgba(76, 16, 140, 0.16)",
+                    },
+                  },
+                }}
+              />
+              <Box sx={{ display: "flex", justifyContent: "space-between", mt: 0.5 }}>
+                <Typography variant="body2" color="text.secondary">
+                  {formatCurrency(100000)}
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  {formatCurrency(maxPossibleLoan)}
+                </Typography>
+              </Box>
+            </Box>
+          </CardContent>
+        </Card>
+        <Box sx={{ mt: 3 }}>
+          <Typography variant="h6" sx={{ mb: 2, color: "#4C108C" }}>
+            Suggestions to increase your borrowing power
+          </Typography>
+
+          <Grid container spacing={2}>
+            {/* Suggestion 1: Reduce Debt */}
+            <Grid item xs={12} md={4}>
+              <Card elevation={1} sx={{ height: "100%" }}>
+                <CardContent sx={{ p: 2 }}>
+                  <Box sx={{ display: "flex", alignItems: "center", mb: 1.5 }}>
+                    <Box
+                      sx={{
+                        backgroundColor: "#FAF1E2",
+                        borderRadius: "50%",
+                        width: 40,
+                        height: 40,
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        mr: 1.5,
+                      }}
+                    >
+                      <Typography variant="h6" sx={{ color: "#E30088" }}>
+                        1
+                      </Typography>
+                    </Box>
+                    <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
+                      Reduce existing debt
+                    </Typography>
+                  </Box>
+                  <Typography variant="body2" color="text.secondary">
+                    Pay down credit cards, personal loans, or other debts to improve your debt-to-income ratio. Lenders
+                    typically prefer this ratio to be below 36%.
+                  </Typography>
+                </CardContent>
+              </Card>
+            </Grid>
+
+            {/* Suggestion 2: Increase Income */}
+            <Grid item xs={12} md={4}>
+              <Card elevation={1} sx={{ height: "100%" }}>
+                <CardContent sx={{ p: 2 }}>
+                  <Box sx={{ display: "flex", alignItems: "center", mb: 1.5 }}>
+                    <Box
+                      sx={{
+                        backgroundColor: "#FAF1E2",
+                        borderRadius: "50%",
+                        width: 40,
+                        height: 40,
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        mr: 1.5,
+                      }}
+                    >
+                      <Typography variant="h6" sx={{ color: "#E30088" }}>
+                        2
+                      </Typography>
+                    </Box>
+                    <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
+                      Increase your income
+                    </Typography>
+                  </Box>
+                  <Typography variant="body2" color="text.secondary">
+                    Document additional income sources like bonuses, overtime, or side jobs. Consider asking for a raise
+                    or finding higher-paying employment to boost your borrowing capacity.
+                  </Typography>
+                </CardContent>
+              </Card>
+            </Grid>
+
+            {/* Suggestion 3: Improve Credit Score */}
+            <Grid item xs={12} md={4}>
+              <Card elevation={1} sx={{ height: "100%" }}>
+                <CardContent sx={{ p: 2 }}>
+                  <Box sx={{ display: "flex", alignItems: "center", mb: 1.5 }}>
+                    <Box
+                      sx={{
+                        backgroundColor: "#FAF1E2",
+                        borderRadius: "50%",
+                        width: 40,
+                        height: 40,
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        mr: 1.5,
+                      }}
+                    >
+                      <Typography variant="h6" sx={{ color: "#E30088" }}>
+                        3
+                      </Typography>
+                    </Box>
+                    <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
+                      Improve credit score
+                    </Typography>
+                  </Box>
+                  <Typography variant="body2" color="text.secondary">
+                    Pay bills on time, keep credit card balances low, and avoid applying for new credit. A higher credit
+                    score can qualify you for better interest rates and loan terms.
+                  </Typography>
+                </CardContent>
+              </Card>
+            </Grid>
+          </Grid>
+        </Box>
+
+        {/* Product Display */}
+        <Box sx={{ mb: 3 }}>
+          <Typography variant="h6" sx={{ mb: 1, color: "#4C108C" }}>
+            Recommended Loan Product
+          </Typography>
+          <SquareLoanCard
+            productName="Athena Variable P&I 70-80% LVR"
+            loanAmount={loanAmount}
+            loanTerm={30}
+            interestRate={7.98}
+            repaymentAmount={Math.round(loanAmount * 0.00733)} // Simplified calculation for demo
+            repaymentFrequency="monthly"
+            variant="standard"
+          />
+        </Box>
+
+        {/* Options to Increase Max Loan Amount */}
+        {!canAfford && (
+          <Box>
+            <Typography variant="h6" sx={{ mb: 1, color: "#4C108C" }}>
+              Options to Increase Your Borrowing Power
+            </Typography>
+            <Grid container spacing={2}>
+              {getAffordabilityOptions().map((option, index) => (
+                <Grid item xs={12} sm={4} key={index}>
+                  <Card
+                    elevation={1}
+                    sx={{
+                      borderRadius: 1,
+                      height: "100%",
+                      transition: "transform 0.2s, box-shadow 0.2s",
+                      "&:hover": {
+                        transform: "translateY(-4px)",
+                        boxShadow: "0 4px 10px rgba(0, 0, 0, 0.1)",
+                        cursor: "pointer",
+                      },
+                    }}
+                  >
+                    <CardContent>
+                      <Box sx={{ display: "flex", alignItems: "center", mb: 1 }}>
+                        <Box sx={{ mr: 1 }}>{option.icon}</Box>
+                        <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
+                          {option.title}
+                        </Typography>
+                      </Box>
+                      <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+                        {option.description}
+                      </Typography>
+                      <Typography variant="h6" sx={{ color: "#00C853", fontWeight: 700 }}>
+                        {option.impact}
+                      </Typography>
+                    </CardContent>
+                  </Card>
+                </Grid>
+              ))}
+            </Grid>
+          </Box>
+        )}
+      </Box>
+    </ThemeProvider>
+  )
+}
+
+export default LoanAffordabilityResults
+
+```
