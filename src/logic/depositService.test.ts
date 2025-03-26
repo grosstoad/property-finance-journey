@@ -11,6 +11,7 @@ import {
   DEFAULT_UPFRONT_COSTS, 
   DEFAULT_UPFRONT_COSTS_PERCENTAGE 
 } from '../constants/defaultValues';
+import { AustralianState } from '../types/stampDuty';
 
 // Mock stampDutyCalculator to isolate tests
 jest.mock('./stampDutyCalculator');
@@ -55,7 +56,7 @@ describe('calculateDepositDetails', () => {
     const params = {
       propertyPrice: 500000,
       savings: 125000,
-      state: 'NSW'
+      state: 'NSW' as AustralianState
     };
 
     const result = calculateDepositDetails(params);
