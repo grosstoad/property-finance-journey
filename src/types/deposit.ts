@@ -8,7 +8,9 @@ import { LoanPurpose } from './loan';
 export interface DepositCalculationParams {
   propertyPrice: number;
   savings: number;
-  state: string;
+  state: AustralianState;
+  purpose?: PropertyPurpose;
+  firstHomeBuyer?: boolean;
 }
 
 // Deposit calculation result

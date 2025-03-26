@@ -24,15 +24,30 @@ import { AustralianState } from '../types/stampDuty';
  * Calculate upfront costs for a property purchase
  * 
  * @param propertyPrice - The price of the property
- * @returns The calculated upfront costs
+ * @returns The total upfront costs
  */
 export const calculateUpfrontCosts = (propertyPrice: number): number => {
-  if (propertyPrice <= 0) {
-    return DEFAULT_UPFRONT_COSTS;
-  }
-
-  const calculatedAmount = propertyPrice * DEFAULT_UPFRONT_COSTS_PERCENTAGE;
-  return Math.max(calculatedAmount, DEFAULT_UPFRONT_COSTS);
+  // Base upfront costs are calculated as a percentage of the property price
+  // This includes legal fees, inspections, transfer fees, loan establishment fees
+  const basePercentage = 0.0015; // .5% of property price for total upfront costs
+  
+  const baseCosts = propertyPrice * basePercentage;
+  
+  // Add fixed costs for standard expenses
+  const fixedCosts = 1000; // $1000 fixed costs
+  
+  // Calculate total upfront costs
+  const totalUpfrontCosts = baseCosts + fixedCosts;
+  
+  console.log('Calculated upfront costs:', {
+    propertyPrice,
+    basePercentage,
+    baseCosts,
+    fixedCosts,
+    totalUpfrontCosts
+  });
+  
+  return totalUpfrontCosts;
 };
 
 /**
@@ -73,15 +88,15 @@ export const calculateLoanAmountRequired = (params: LoanAmountParams): LoanAmoun
  * @returns Detailed deposit calculation result
  */
 export const calculateDepositDetails = (params: DepositCalculationParams): DepositCalculationResult => {
-  const { propertyPrice, savings, state } = params;
+  const { propertyPrice, savings, state, purpose = 'owner-occupied', firstHomeBuyer = false } = params;
   
   // Calculate upfront costs and stamp duty
   const upfrontCosts = calculateUpfrontCosts(propertyPrice);
   const stampDutyResult = calculateStampDuty({
     propertyPrice,
     state: state as AustralianState,
-    purpose: 'owner-occupied',
-    firstHomeBuyer: false
+    purpose,
+    firstHomeBuyer
   });
   
   // Calculate available deposit after costs
@@ -102,4 +117,68 @@ export const calculateDepositDetails = (params: DepositCalculationParams): Depos
     hasShortfall,
     shortfallAmount
   };
+};
+
+/**
+ * Calculate the deposit components for a property
+ * 
+ * @param propertyValue - The value of the property
+ * @param state - The Australian state where the property is located
+ * @param isFirstHomeBuyer - Whether the buyer is a first home buyer
+ * @param isInvestmentProperty - Whether the property is for investment
+ * @returns The deposit components (stamp duty, legal fees, upfront costs)
+ */
+export const calculateDepositComponents = (
+  propertyValue: number,
+  state: string,
+  isFirstHomeBuyer: boolean,
+  isInvestmentProperty: boolean
+): { 
+  stampDuty: number;
+  legalFees: number;
+  otherUpfrontCosts: number;
+} => {
+  console.log('Calculating deposit components with:', {
+    propertyValue,
+    state,
+    isFirstHomeBuyer,
+    isInvestmentProperty
+  });
+
+  // Calculate stamp duty
+  const stampDutyResult = calculateStampDuty({
+    propertyPrice: propertyValue,
+    state: state as AustralianState,
+    purpose: isInvestmentProperty ? 'investment' : 'owner-occupied',
+    firstHomeBuyer: isFirstHomeBuyer
+  });
+  
+  // Calculate upfront costs
+  const upfrontCosts = calculateUpfrontCosts(propertyValue);
+  
+  // Legal fees are part of upfront costs - assume 30% of upfront costs are legal fees
+  const legalFees = upfrontCosts * 0.3;
+  const otherUpfrontCosts = upfrontCosts * 0.7;
+  
+  const result = {
+    stampDuty: stampDutyResult.stampDuty,
+    legalFees,
+    otherUpfrontCosts
+  };
+  
+  console.log('Deposit components calculation result:', {
+    stampDuty: result.stampDuty,
+    legalFees: result.legalFees, 
+    otherUpfrontCosts: result.otherUpfrontCosts,
+    total: result.stampDuty + result.legalFees + result.otherUpfrontCosts
+  });
+  
+  return result;
+};
+
+export const depositService = {
+  calculateUpfrontCosts,
+  calculateLoanAmountRequired,
+  calculateDepositDetails,
+  calculateDepositComponents
 }; 

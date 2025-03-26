@@ -6,7 +6,7 @@ import {
   PropertyType 
 } from '../types/FinancialTypes';
 import { GLOBAL_LIMITS } from '../constants/financialConstants';
-import { calculateDepositDetails } from '../logic/calculateMaxBorrowingDeposit';
+import { depositService } from '../logic/depositService';
 
 // Define property suggestion and property types
 interface PropertySuggestion {
@@ -56,57 +56,65 @@ interface PropertyContextType {
   setIsSearching: (isSearching: boolean) => void;
 }
 
+// Create the PropertyContext
 const PropertyContext = createContext<PropertyContextType | undefined>(undefined);
 
-// Initialize with default values
 const getDefaultPropertyDetails = (): PropertyDetails => {
   return {
     address: '',
-    postcode: '2000', // Default to Sydney CBD
+    postcode: '',
     propertyType: PropertyType.HOUSE,
-    propertyValue: 750000, // Default property value
+    propertyValue: 800000,
     purpose: LoanPurposeType.OWNER_OCCUPIED,
-    isFirstHomeBuyer: false
+    isFirstHomeBuyer: false,
   };
 };
 
 const getDefaultDepositDetails = (): DepositDetails => {
   return {
-    savings: 150000, // Default savings
-    depositAmount: 150000 - GLOBAL_LIMITS.DEFAULT_UPFRONT_COSTS, // Savings minus upfront costs
-    stampDuty: 0, // Will be calculated
-    otherCosts: GLOBAL_LIMITS.DEFAULT_UPFRONT_COSTS
+    savings: 200000,
+    depositAmount: 160000,
+    stampDuty: 32000,
+    otherCosts: 3000,
   };
 };
 
 export const PropertyProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [propertyDetails, setPropertyDetails] = useState<PropertyDetails>(getDefaultPropertyDetails());
   const [depositDetails, setDepositDetails] = useState<DepositDetails>(getDefaultDepositDetails());
-  const [requiredLoanAmount, setRequiredLoanAmount] = useState<number>(0);
-  
-  // Add new states for property search
-  const [searchQuery, setSearchQuery] = useState<string>('');
+  const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<PropertySuggestion[]>([]);
   const [selectedProperty, setSelectedProperty] = useState<Property | null>(null);
-  const [isSearching, setIsSearching] = useState<boolean>(false);
+  const [isSearching, setIsSearching] = useState(false);
   
-  // Calculate deposit details whenever property details or savings change
+  // Calculate required loan amount
+  const requiredLoanAmount = propertyDetails.propertyValue - depositDetails.depositAmount;
+  
+  // Recalculate deposit details when property value or savings changes
   useEffect(() => {
-    const updatedDepositDetails = calculateDepositDetails(
+    // Get property details for deposit calculation
+    const isInvestmentProperty = propertyDetails.purpose === LoanPurposeType.INVESTMENT;
+    
+    // Calculate deposit components
+    const { stampDuty, legalFees, otherUpfrontCosts } = depositService.calculateDepositComponents(
       propertyDetails.propertyValue,
-      depositDetails.savings,
-      propertyDetails
+      propertyDetails.postcode.substring(0, 3) || 'NSW', // Use first 3 digits of postcode as state or default to NSW
+      propertyDetails.isFirstHomeBuyer,
+      isInvestmentProperty
     );
     
-    setDepositDetails(updatedDepositDetails);
+    // Calculate available for deposit
+    const totalUpfrontCosts = stampDuty + legalFees + otherUpfrontCosts;
+    const depositAmount = Math.max(0, depositDetails.savings - totalUpfrontCosts);
     
-    // Calculate required loan amount
-    const newRequiredLoanAmount = Math.max(
-      0, 
-      propertyDetails.propertyValue - updatedDepositDetails.depositAmount
-    );
-    setRequiredLoanAmount(newRequiredLoanAmount);
-  }, [propertyDetails, depositDetails.savings]);
+    // Update deposit details
+    setDepositDetails(prev => ({
+      ...prev,
+      depositAmount,
+      stampDuty,
+      otherCosts: legalFees + otherUpfrontCosts
+    }));
+  }, [propertyDetails.propertyValue, depositDetails.savings, propertyDetails.isFirstHomeBuyer, propertyDetails.purpose, propertyDetails.postcode]);
   
   const updateProperty = (updates: Partial<PropertyDetails>) => {
     setPropertyDetails((prev: PropertyDetails) => ({ ...prev, ...updates }));

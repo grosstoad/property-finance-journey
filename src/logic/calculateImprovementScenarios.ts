@@ -1,173 +1,436 @@
-import { BorrowingConstraint, FinancialsInput, ImprovementScenario, FrequencyType } from '../types/FinancialTypes';
-import { calculateMaxBorrowingByDeposit } from './calculateMaxBorrowingByDeposit';
-import { calculateMaxBorrowingByFinancials } from './calculateMaxBorrowingByFinancials';
-import { calculateServiceability } from './calculateServiceability';
-import { convertToMonthly } from './frequencyConverter';
+import { 
+  BorrowingConstraint, 
+  FinancialsInput, 
+  ImprovementScenario, 
+  FrequencyType,
+  MaxBorrowingResult,
+  HEMParameters,
+  MaxBorrowAmountReason
+} from '../types/FinancialTypes';
+
+import { LoanPreferences, LoanProductDetails } from '../types/loan';
+import { calculateMaxBorrowing } from './maxBorrow/adapter';
+import { getHigherOfDeclaredOrHEM } from './hemService';
+import { formatCurrency } from './formatters';
+import { v4 as uuidv4 } from 'uuid';
+import { GLOBAL_LIMITS } from '../constants/financialConstants';
 
 /**
  * Calculate improvement scenarios based on the borrowing constraint
  * @param financials Financial inputs
- * @param borrowingConstraint Current borrowing constraint
- * @param currentMaxBorrowing Current maximum borrowing amount
+ * @param currentMaxBorrowing Current maximum borrowing calculation result
+ * @param loanProductDetails Loan product details
  * @param savings Total available savings
- * @param propertyPrice Property price
+ * @param propertyValue Property value
  * @param propertyState Property state
+ * @param propertyPostcode Property postcode
  * @param isFirstHomeBuyer Whether the buyer is a first home buyer
  * @param isInvestmentProperty Whether the property is for investment
- * @param baseInterestRate Base interest rate
- * @param maxLvr Maximum LVR ratio (0-1)
+ * @param loanAmountRequired Required loan amount
+ * @param loanPreferences Loan preferences from UI
  * @returns List of improvement scenarios
  */
 export function calculateImprovementScenarios(
   financials: FinancialsInput,
-  borrowingConstraint: BorrowingConstraint,
-  currentMaxBorrowing: number,
+  currentMaxBorrowing: MaxBorrowingResult,
+  loanProductDetails: LoanProductDetails,
   savings: number,
-  propertyPrice: number,
+  propertyValue: number,
   propertyState: string,
+  propertyPostcode: string,
   isFirstHomeBuyer: boolean = false,
   isInvestmentProperty: boolean = false,
-  baseInterestRate: number = 5.0,
-  maxLvr: number = 0.8,
+  loanAmountRequired: number = 0,
+  loanPreferences?: LoanPreferences
 ): ImprovementScenario[] {
-  const scenarios: ImprovementScenario[] = [];
+  // 1. Entry Point Logging
+  console.log('[SCENARIOS_DETAIL] Starting scenario calculation with:', {
+    maxBorrowAmount: currentMaxBorrowing.maxBorrowAmount,
+    maxBorrowAmountReason: currentMaxBorrowing.maxBorrowAmountReason,
+    loanAmountRequired,
+    shortfall: loanAmountRequired - currentMaxBorrowing.maxBorrowAmount,
+    financialsData: {
+      hasExpenses: !!financials.liabilities?.expenses,
+      expenseAmount: financials.liabilities?.expenses?.value,
+      expenseFrequency: financials.liabilities?.expenses?.frequency,
+      hasCreditCard: !!financials.liabilities?.creditCardLimit,
+      creditCardLimit: financials.liabilities?.creditCardLimit,
+    }
+  });
   
-  // Global max borrowing constraint can't be improved
-  if (borrowingConstraint === 'global') {
+  const scenarios: ImprovementScenario[] = [];
+  const startTime = performance.now();
+  
+  // Initial check logging
+  console.log('[SCENARIOS_DETAIL] Initial requirement check:', {
+    loanAmountRequired,
+    maxBorrowAmount: currentMaxBorrowing.maxBorrowAmount,
+    needsScenarios: loanAmountRequired > currentMaxBorrowing.maxBorrowAmount
+  });
+  
+  if (loanAmountRequired === 0 || loanAmountRequired <= currentMaxBorrowing.maxBorrowAmount) {
+    console.log('[SCENARIOS_DETAIL] No improvement scenarios needed - loan amount required is covered');
     return [];
   }
   
-  // For deposit constraint, suggest increasing savings
-  if (borrowingConstraint === 'deposit') {
-    // Scenario 1: Increase savings by $20,000
-    const increasedSavings20k = calculateMaxBorrowingByDeposit(
-      savings + 20000,
-      propertyState,
-      isFirstHomeBuyer,
-      isInvestmentProperty,
-      maxLvr
-    );
-    
-    scenarios.push({
-      title: 'Increase savings by $20,000',
-      description: 'Adding more to your deposit can increase your borrowing power',
-      potentialIncrease: 20000,
-      type: 'SAVINGS',
-      impact: increasedSavings20k - currentMaxBorrowing,
-      newMaxBorrowing: increasedSavings20k,
+  // Global max check logging
+  console.log('[SCENARIOS_DETAIL] Checking global max constraint:', {
+    reason: currentMaxBorrowing.maxBorrowAmountReason,
+    isGlobalMax: currentMaxBorrowing.maxBorrowAmountReason === 'global'
+  });
+  
+  // Handle each constraint type
+  switch (currentMaxBorrowing.maxBorrowAmountReason) {
+    case 'global':
+      console.log('[SCENARIOS_DETAIL] Global max borrowing constraint reached - returning global max message');
+      return [{
+        title: 'Maximum lending limit reached',
+        description: `$${formatCurrency(GLOBAL_LIMITS.MAX_BORROWING)} is the maximum amount we lend to a property at Athena.`,
+        potentialIncrease: 0,
+        type: 'GLOBAL_MAX',
+        impact: 0,
+        newMaxBorrowing: currentMaxBorrowing.maxBorrowAmount,
+        id: uuidv4()
+      }];
+
+    case 'financials':
+    case 'unserviceable':
+      return calculateFinancialScenarios(
+        financials,
+        currentMaxBorrowing,
+        loanProductDetails,
+        savings,
+        propertyValue,
+        propertyState,
+        propertyPostcode,
+        isFirstHomeBuyer,
+        isInvestmentProperty,
+        loanAmountRequired,
+        loanPreferences
+      );
+
+    case 'deposit':
+      return calculateDepositScenarios(
+        financials,
+        currentMaxBorrowing,
+        loanProductDetails,
+        savings,
+        propertyValue,
+        propertyState,
+        propertyPostcode,
+        isFirstHomeBuyer,
+        isInvestmentProperty,
+        loanAmountRequired,
+        loanPreferences
+      );
+
+    default:
+      console.warn('[SCENARIOS_DETAIL] Unknown constraint type:', currentMaxBorrowing.maxBorrowAmountReason);
+      return [];
+  }
+}
+
+/**
+ * Calculate scenarios for financial/serviceability constraints
+ */
+function calculateFinancialScenarios(
+  financials: FinancialsInput,
+  currentMaxBorrowing: MaxBorrowingResult,
+  loanProductDetails: LoanProductDetails,
+  savings: number,
+  propertyValue: number,
+  propertyState: string,
+  propertyPostcode: string,
+  isFirstHomeBuyer: boolean,
+  isInvestmentProperty: boolean,
+  loanAmountRequired: number,
+  loanPreferences?: LoanPreferences
+): ImprovementScenario[] {
+  const scenarios: ImprovementScenario[] = [];
+  const startTime = performance.now();
+  
+  const maritalStatus = (financials.applicantType === 'joint') ? 'married' as const : 'single' as const;
+  
+  const hemParameters: HEMParameters = {
+    postcode: propertyPostcode,
+    grossIncome: financials.applicant1.baseSalaryIncome.value * getFrequencyMultiplier(financials.applicant1.baseSalaryIncome.frequency) + 
+               (financials.applicant2 ? financials.applicant2.baseSalaryIncome.value * getFrequencyMultiplier(financials.applicant2?.baseSalaryIncome.frequency || 'yearly') : 0),
+    maritalStatus,
+    dependents: financials.numDependents
+  };
+  
+  const declaredExpenses = financials.liabilities.expenses.value;
+  const expensesFrequency = financials.liabilities.expenses.frequency;
+  const annualizedDeclaredExpenses = declaredExpenses * getFrequencyMultiplier(expensesFrequency);
+  const creditCardLimit = financials.liabilities.creditCardLimit || 0;
+  
+  const hemResult = getHigherOfDeclaredOrHEM(annualizedDeclaredExpenses, hemParameters);
+  const isUsingHEM = hemResult.isHEM;
+  const hemAmount = hemResult.hemAmount;
+  
+  // 2. HEM Calculation Logging
+  console.log('[SCENARIOS_DETAIL] HEM calculation:', {
+    declaredExpenses: annualizedDeclaredExpenses,
+    hemAmount,
+    isUsingHEM,
+    wouldShowExpenseScenario: !isUsingHEM && annualizedDeclaredExpenses > hemAmount
+  });
+  
+  // 3. Scenario Generation Logging
+  console.log('[SCENARIOS_DETAIL] Scenario eligibility:', {
+    canShowExpenseScenario: !isUsingHEM && annualizedDeclaredExpenses > hemAmount,
+    canShowCreditCardScenario: creditCardLimit > 0,
+    canShowLVRScenario: currentMaxBorrowing.maxBorrowingAmountFinancialsUsed !== 'maxBorrowingAmountFinancials_0_50',
+    isDepositConstrained: currentMaxBorrowing.maxBorrowAmountReason === 'deposit'
+  });
+  
+  // Expense reduction scenario
+  if (!isUsingHEM && annualizedDeclaredExpenses > hemAmount) {
+    console.log('[SCENARIOS_DETAIL] Calculating expense reduction scenario:', {
+      currentExpenses: annualizedDeclaredExpenses,
+      targetExpenses: hemAmount,
+      potentialReduction: annualizedDeclaredExpenses - hemAmount
     });
     
-    // Scenario 2: Increase savings by $50,000
-    const increasedSavings50k = calculateMaxBorrowingByDeposit(
-      savings + 50000,
+    const modifiedFinancials = JSON.parse(JSON.stringify(financials));
+    const reducedExpenses = hemAmount / getFrequencyMultiplier(expensesFrequency);
+    modifiedFinancials.liabilities.expenses.value = reducedExpenses;
+    
+    const newMaxBorrowing = calculateMaxBorrowing(
+      modifiedFinancials,
+      loanProductDetails,
+      propertyValue,
+      isInvestmentProperty, 
+      propertyPostcode,
+      savings,
       propertyState,
       isFirstHomeBuyer,
-      isInvestmentProperty,
-      maxLvr
+      loanAmountRequired,
+      false,
+      loanPreferences
     );
     
-    scenarios.push({
-      title: 'Increase savings by $50,000',
-      description: 'A larger deposit significantly increases your borrowing power',
-      potentialIncrease: 50000,
-      type: 'SAVINGS',
-      impact: increasedSavings50k - currentMaxBorrowing,
-      newMaxBorrowing: increasedSavings50k,
+    // 4. Individual Scenario Calculation Results
+    console.log('[SCENARIOS_DETAIL] Expense scenario calculation result:', {
+      scenarioType: 'EXPENSES',
+      originalAmount: currentMaxBorrowing.maxBorrowAmount,
+      newAmount: newMaxBorrowing.maxBorrowAmount,
+      impact: newMaxBorrowing.maxBorrowAmount - currentMaxBorrowing.maxBorrowAmount,
+      wasScenarioAdded: newMaxBorrowing.maxBorrowAmount > currentMaxBorrowing.maxBorrowAmount
     });
     
-    // Scenario 3: Increase savings by $100,000
-    const increasedSavings100k = calculateMaxBorrowingByDeposit(
-      savings + 100000,
-      propertyState,
-      isFirstHomeBuyer,
-      isInvestmentProperty,
-      maxLvr
-    );
-    
-    scenarios.push({
-      title: 'Increase savings by $100,000',
-      description: 'A substantial deposit boost can maximize your borrowing power',
-      potentialIncrease: 100000,
-      type: 'SAVINGS',
-      impact: increasedSavings100k - currentMaxBorrowing,
-      newMaxBorrowing: increasedSavings100k,
-    });
+    if (newMaxBorrowing.maxBorrowAmount > currentMaxBorrowing.maxBorrowAmount) {
+      const impact = newMaxBorrowing.maxBorrowAmount - currentMaxBorrowing.maxBorrowAmount;
+      const monthlyReduction = (annualizedDeclaredExpenses - hemAmount) / 12;
+      
+      scenarios.push({
+        id: uuidv4(),
+        title: 'Reduce expenses to minimum',
+        description: `Reducing your expenses by ${formatCurrency(monthlyReduction)}/month could increase your borrowing power by ${formatCurrency(impact)}`,
+        type: 'EXPENSES',
+        potentialIncrease: reducedExpenses,
+        impact,
+        newMaxBorrowing: newMaxBorrowing.maxBorrowAmount
+      });
+    }
   }
   
-  // For financials constraint, suggest reducing expenses or credit card
-  if (borrowingConstraint === 'financials') {
-    // Calculate HEM for comparison
-    let hem = 25000; // Base annual HEM (simplified)
-    if (financials.applicantType === 'joint') {
-      hem += 25000 * 0.6; // Add 60% for second applicant
-    }
-    hem += financials.numDependents * 5000; // Add for dependents
-    const monthlyHem = hem / 12;
+  // Credit card scenario
+  if (creditCardLimit > 0) {
+    console.log('[SCENARIOS_DETAIL] Calculating credit card removal scenario:', {
+      currentCreditCardLimit: creditCardLimit
+    });
     
-    // Scenario 1: Reduce expenses to minimum (HEM)
-    const monthlyExpenses = convertToMonthly(
-      financials.liabilities.expenses.value,
-      financials.liabilities.expenses.frequency
+    const modifiedFinancials = JSON.parse(JSON.stringify(financials));
+    modifiedFinancials.liabilities.creditCardLimit = 0;
+    
+    const newMaxBorrowing = calculateMaxBorrowing(
+      modifiedFinancials,
+      loanProductDetails,
+      propertyValue,
+      isInvestmentProperty, 
+      propertyPostcode,
+      savings,
+      propertyState,
+      isFirstHomeBuyer,
+      loanAmountRequired,
+      false,
+      loanPreferences
     );
     
-    if (monthlyExpenses > monthlyHem) {
-      const financialsWithMinExpenses = {
-        ...financials,
-        liabilities: {
-          ...financials.liabilities,
-          expenses: {
-            value: monthlyHem,
-            frequency: 'monthly' as FrequencyType,
-          },
-        },
-      };
-      
-      const { maxLoanAmount } = calculateMaxBorrowingByFinancials(
-        financialsWithMinExpenses,
-        baseInterestRate,
-        30,
-        propertyPrice,
-        isInvestmentProperty
-      );
-      
-      scenarios.push({
-        title: 'Reduce expenses to minimum',
-        description: 'Lowering your living expenses can improve serviceability',
-        potentialIncrease: monthlyExpenses - monthlyHem,
-        type: 'EXPENSES',
-        impact: maxLoanAmount - currentMaxBorrowing,
-        newMaxBorrowing: maxLoanAmount,
-      });
-    }
+    console.log('[SCENARIOS_DETAIL] Credit card scenario calculation result:', {
+      scenarioType: 'CREDIT',
+      originalAmount: currentMaxBorrowing.maxBorrowAmount,
+      newAmount: newMaxBorrowing.maxBorrowAmount,
+      impact: newMaxBorrowing.maxBorrowAmount - currentMaxBorrowing.maxBorrowAmount,
+      wasScenarioAdded: newMaxBorrowing.maxBorrowAmount > currentMaxBorrowing.maxBorrowAmount
+    });
     
-    // Scenario 2: Close credit cards
-    if (financials.liabilities.creditCardLimit > 0) {
-      const financialsWithoutCreditCards = {
-        ...financials,
-        liabilities: {
-          ...financials.liabilities,
-          creditCardLimit: 0,
-        },
-      };
-      
-      const { maxLoanAmount } = calculateMaxBorrowingByFinancials(
-        financialsWithoutCreditCards,
-        baseInterestRate,
-        30,
-        propertyPrice,
-        isInvestmentProperty
-      );
+    if (newMaxBorrowing.maxBorrowAmount > currentMaxBorrowing.maxBorrowAmount) {
+      const impact = newMaxBorrowing.maxBorrowAmount - currentMaxBorrowing.maxBorrowAmount;
       
       scenarios.push({
+        id: uuidv4(),
         title: 'Close credit cards',
-        description: 'Cancelling or reducing your credit card limits can improve borrowing power',
-        potentialIncrease: financials.liabilities.creditCardLimit,
+        description: `Closing your credit cards with a total limit of ${formatCurrency(creditCardLimit)} could increase your borrowing power by ${formatCurrency(impact)}`,
         type: 'CREDIT',
-        impact: maxLoanAmount - currentMaxBorrowing,
-        newMaxBorrowing: maxLoanAmount,
+        potentialIncrease: creditCardLimit,
+        impact,
+        newMaxBorrowing: newMaxBorrowing.maxBorrowAmount
       });
     }
   }
+  
+  // LVR improvement scenarios
+  if (currentMaxBorrowing.maxBorrowingAmountFinancialsUsed !== 'maxBorrowingAmountFinancials_0_50') {
+    console.log('[SCENARIOS_DETAIL] Calculating LVR improvement scenarios');
+    
+    const additionalSavingsAmounts = [20000, 50000, 100000];
+    
+    for (const additionalAmount of additionalSavingsAmounts) {
+      console.log('[SCENARIOS_DETAIL] Calculating savings increase scenario:', {
+        additionalAmount,
+        currentSavings: savings,
+        newTotalSavings: savings + additionalAmount
+      });
+      
+      const newMaxBorrowing = calculateMaxBorrowing(
+        financials,
+        loanProductDetails,
+        propertyValue,
+        isInvestmentProperty, 
+        propertyPostcode,
+        savings + additionalAmount,
+        propertyState,
+        isFirstHomeBuyer,
+        loanAmountRequired,
+        false,
+        loanPreferences
+      );
+      
+      console.log('[SCENARIOS_DETAIL] Savings scenario calculation result:', {
+        scenarioType: 'SAVINGS',
+        additionalAmount,
+        originalAmount: currentMaxBorrowing.maxBorrowAmount,
+        newAmount: newMaxBorrowing.maxBorrowAmount,
+        impact: newMaxBorrowing.maxBorrowAmount - currentMaxBorrowing.maxBorrowAmount,
+        wasScenarioAdded: newMaxBorrowing.maxBorrowAmount > currentMaxBorrowing.maxBorrowAmount
+      });
+      
+      if (newMaxBorrowing.maxBorrowAmount > currentMaxBorrowing.maxBorrowAmount) {
+        const impact = newMaxBorrowing.maxBorrowAmount - currentMaxBorrowing.maxBorrowAmount;
+        const newTotal = savings + additionalAmount;
+        
+        scenarios.push({
+          id: uuidv4(),
+          title: `Increase savings by ${formatCurrency(additionalAmount)}`,
+          description: `Increasing your savings to ${formatCurrency(newTotal)} could improve your LVR and increase your borrowing power by ${formatCurrency(impact)}`,
+          type: 'SAVINGS',
+          potentialIncrease: additionalAmount,
+          impact,
+          newMaxBorrowing: newMaxBorrowing.maxBorrowAmount
+        });
+      }
+    }
+  }
+  
+  // Log completion
+  console.log('[SCENARIOS_DETAIL] Completed financial scenario generation:', {
+    totalScenariosGenerated: scenarios.length,
+    scenarioTypes: scenarios.map(s => s.type),
+    totalPotentialIncrease: scenarios.reduce((sum, s) => sum + s.impact, 0),
+    executionTimeMs: performance.now() - startTime
+  });
   
   return scenarios;
-} 
+}
+
+/**
+ * Calculate scenarios for deposit constraints
+ */
+function calculateDepositScenarios(
+  financials: FinancialsInput,
+  currentMaxBorrowing: MaxBorrowingResult,
+  loanProductDetails: LoanProductDetails,
+  savings: number,
+  propertyValue: number,
+  propertyState: string,
+  propertyPostcode: string,
+  isFirstHomeBuyer: boolean,
+  isInvestmentProperty: boolean,
+  loanAmountRequired: number,
+  loanPreferences?: LoanPreferences
+): ImprovementScenario[] {
+  const scenarios: ImprovementScenario[] = [];
+  const startTime = performance.now();
+  
+  const additionalSavingsAmounts = [20000, 50000, 100000];
+  
+  for (const additionalAmount of additionalSavingsAmounts) {
+    console.log('[SCENARIOS_DETAIL] Calculating deposit scenario:', {
+      additionalAmount,
+      currentSavings: savings,
+      newTotalSavings: savings + additionalAmount
+    });
+    
+    const newMaxBorrowing = calculateMaxBorrowing(
+      financials,
+      loanProductDetails,
+      propertyValue,
+      isInvestmentProperty, 
+      propertyPostcode,
+      savings + additionalAmount,
+      propertyState,
+      isFirstHomeBuyer,
+      loanAmountRequired,
+      false,
+      loanPreferences
+    );
+    
+    console.log('[SCENARIOS_DETAIL] Deposit scenario calculation result:', {
+      scenarioType: 'SAVINGS',
+      additionalAmount,
+      originalAmount: currentMaxBorrowing.maxBorrowAmount,
+      newAmount: newMaxBorrowing.maxBorrowAmount,
+      impact: newMaxBorrowing.maxBorrowAmount - currentMaxBorrowing.maxBorrowAmount,
+      wasScenarioAdded: newMaxBorrowing.maxBorrowAmount > currentMaxBorrowing.maxBorrowAmount
+    });
+    
+    if (newMaxBorrowing.maxBorrowAmount > currentMaxBorrowing.maxBorrowAmount) {
+      const impact = newMaxBorrowing.maxBorrowAmount - currentMaxBorrowing.maxBorrowAmount;
+      const newTotal = savings + additionalAmount;
+      
+      scenarios.push({
+        id: uuidv4(),
+        title: `Increase savings by ${formatCurrency(additionalAmount)}`,
+        description: `Increasing your savings to ${formatCurrency(newTotal)} would provide the deposit needed to increase your borrowing power by ${formatCurrency(impact)}`,
+        type: 'SAVINGS',
+        potentialIncrease: additionalAmount,
+        impact,
+        newMaxBorrowing: newMaxBorrowing.maxBorrowAmount
+      });
+    }
+  }
+  
+  // Log completion
+  console.log('[SCENARIOS_DETAIL] Completed deposit scenario generation:', {
+    totalScenariosGenerated: scenarios.length,
+    scenarioTypes: scenarios.map(s => s.type),
+    totalPotentialIncrease: scenarios.reduce((sum, s) => sum + s.impact, 0),
+    executionTimeMs: performance.now() - startTime
+  });
+  
+  return scenarios;
+}
+
+// Helper function to get frequency multiplier
+function getFrequencyMultiplier(frequency: FrequencyType): number {
+  switch(frequency) {
+    case 'weekly': return 52;
+    case 'fortnightly': return 26;
+    case 'monthly': return 12;
+    case 'yearly': 
+    default: return 1;
+  }
+}
+

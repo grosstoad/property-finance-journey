@@ -230,55 +230,47 @@ export const applyFirstHomeBuyerConcession = (
   const { exemptionThreshold, concessionThreshold, concessionRate } = stateData.firstHomeBuyer;
   
   // Apply full exemption if eligible
-  if (concessionRate === 'full-exemption' && propertyPrice <= exemptionThreshold) {
+  if (propertyPrice <= exemptionThreshold) {
     console.log('Full exemption applied - property price under threshold');
     concessionAmount = baseStampDuty;
     finalAmount = 0;
   } 
   // Apply sliding scale concession if eligible
-  else if (concessionRate === 'sliding-scale' && propertyPrice <= concessionThreshold && propertyPrice > exemptionThreshold) {
+  else if (concessionRate === 'sliding-scale' && propertyPrice <= concessionThreshold) {
     console.log('Sliding scale concession eligible - property price between thresholds');
-    // For NSW: ((1000000 - propertyPrice) / 200000) * baseStampDuty
-    // For VIC: ((750000 - propertyPrice) / 150000) * baseStampDuty
-    // For WA:  ((530000 - propertyPrice) / 100000) * baseStampDuty
-    // For ACT: ((930000 - propertyPrice) / 345000) * baseStampDuty
+    const concessionFormula = stateData.firstHomeBuyer.concessionFormula;
     
-    // Extract the formula pattern
-    if (stateData.firstHomeBuyer.concessionFormula) {
-      const concessionFormula = stateData.firstHomeBuyer.concessionFormula;
-      
-      if (concessionFormula.includes('propertyPrice') && concessionFormula.includes('baseStampDuty')) {
-        try {
-          // NSW formula: ((1000000 - propertyPrice) / 200000) * baseStampDuty
-          if (stateData.firstHomeBuyer.concessionFormula === "((1000000 - propertyPrice) / 200000) * baseStampDuty") {
-            concessionAmount = ((1000000 - propertyPrice) / 200000) * baseStampDuty;
-            console.log('Applied NSW formula', { concessionAmount });
-          }
-          // VIC formula: ((750000 - propertyPrice) / 150000) * baseStampDuty
-          else if (stateData.firstHomeBuyer.concessionFormula === "((750000 - propertyPrice) / 150000) * baseStampDuty") {
-            concessionAmount = ((750000 - propertyPrice) / 150000) * baseStampDuty;
-            console.log('Applied VIC formula', { concessionAmount });
-          }
-          // WA formula: ((530000 - propertyPrice) / 100000) * baseStampDuty
-          else if (stateData.firstHomeBuyer.concessionFormula === "((530000 - propertyPrice) / 100000) * baseStampDuty") {
-            concessionAmount = ((530000 - propertyPrice) / 100000) * baseStampDuty;
-            console.log('Applied WA formula', { concessionAmount });
-          }
-          // ACT formula: ((930000 - propertyPrice) / 345000) * baseStampDuty
-          else if (stateData.firstHomeBuyer.concessionFormula === "((930000 - propertyPrice) / 345000) * baseStampDuty") {
-            concessionAmount = ((930000 - propertyPrice) / 345000) * baseStampDuty;
-            console.log('Applied ACT formula', { concessionAmount });
-          }
-          
-          // Ensure concession amount is not negative and not greater than base duty
-          concessionAmount = Math.max(0, Math.min(concessionAmount, baseStampDuty));
-          finalAmount = baseStampDuty - concessionAmount;
-        } catch (error) {
-          // If there's an error evaluating the formula, fall back to no concession
-          console.error('Error applying concession formula:', error);
-          concessionAmount = 0;
-          finalAmount = baseStampDuty;
+    if (concessionFormula.includes('propertyPrice') && concessionFormula.includes('baseStampDuty')) {
+      try {
+        // NSW formula: ((1000000 - propertyPrice) / 200000) * baseStampDuty
+        if (stateData.firstHomeBuyer.concessionFormula === "((1000000 - propertyPrice) / 200000) * baseStampDuty") {
+          concessionAmount = ((1000000 - propertyPrice) / 200000) * baseStampDuty;
+          console.log('Applied NSW formula', { concessionAmount });
         }
+        // VIC formula: ((750000 - propertyPrice) / 150000) * baseStampDuty
+        else if (stateData.firstHomeBuyer.concessionFormula === "((750000 - propertyPrice) / 150000) * baseStampDuty") {
+          concessionAmount = ((750000 - propertyPrice) / 150000) * baseStampDuty;
+          console.log('Applied VIC formula', { concessionAmount });
+        }
+        // WA formula: ((530000 - propertyPrice) / 100000) * baseStampDuty
+        else if (stateData.firstHomeBuyer.concessionFormula === "((530000 - propertyPrice) / 100000) * baseStampDuty") {
+          concessionAmount = ((530000 - propertyPrice) / 100000) * baseStampDuty;
+          console.log('Applied WA formula', { concessionAmount });
+        }
+        // ACT formula: ((930000 - propertyPrice) / 345000) * baseStampDuty
+        else if (stateData.firstHomeBuyer.concessionFormula === "((930000 - propertyPrice) / 345000) * baseStampDuty") {
+          concessionAmount = ((930000 - propertyPrice) / 345000) * baseStampDuty;
+          console.log('Applied ACT formula', { concessionAmount });
+        }
+        
+        // Ensure concession amount is not negative and not greater than base duty
+        concessionAmount = Math.max(0, Math.min(concessionAmount, baseStampDuty));
+        finalAmount = baseStampDuty - concessionAmount;
+      } catch (error) {
+        // If there's an error evaluating the formula, fall back to no concession
+        console.error('Error applying concession formula:', error);
+        concessionAmount = 0;
+        finalAmount = baseStampDuty;
       }
     }
   } else {

@@ -1,4 +1,5 @@
-import { Box, Container, Typography, styled } from '@mui/material';
+import { Box, Container, Typography, styled, Button } from '@mui/material';
+import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import { PropertySearch } from '../components/PropertySearch';
 import { PropertyInsights } from '../components/PropertyInsights';
 import { PropertyFinanceJourney } from '../components/PropertyFinanceJourney';
@@ -6,52 +7,58 @@ import { useProperty } from '../contexts/PropertyContext';
 
 const PageContainer = styled(Box)(({ theme }) => ({
   minHeight: '100vh',
-  padding: theme.spacing(4, 0),
-  backgroundImage: 'linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%)',
-  backgroundAttachment: 'fixed',
+  padding: 0,
+  backgroundColor: 'white',
+  overflow: 'hidden',
 }));
 
-const Header = styled(Box)(({ theme }) => ({
-  textAlign: 'center',
-  marginBottom: theme.spacing(4),
-}));
-
-const Title = styled(Typography)(({ theme }) => ({
-  fontWeight: 700,
-  marginBottom: theme.spacing(1),
-  color: theme.palette.text.primary,
-}));
-
-const Subtitle = styled(Typography)(({ theme }) => ({
-  color: theme.palette.text.secondary,
-  maxWidth: 600,
+const ContentContainer = styled(Box)(({ theme }) => ({
+  width: '730px', // Fixed width as requested
   margin: '0 auto',
+  padding: theme.spacing(4, 0),
+}));
+
+const StyledComponent = styled(Box)(({ theme }) => ({
+  width: '100%', // Ensure all children components take the full 730px width
+  maxWidth: '730px',
+}));
+
+const BackButton = styled(Button)(({ theme }) => ({
+  marginBottom: theme.spacing(3),
 }));
 
 export const HomePage = () => {
-  const { selectedProperty } = useProperty();
+  const { selectedProperty, setSelectedProperty } = useProperty();
+
+  const handleBackToSearch = () => {
+    setSelectedProperty(null);
+  };
 
   return (
     <PageContainer>
-      <Container maxWidth="lg">
-        <Header>
-          <Title variant="h3">Property Finance Journey</Title>
-          <Subtitle variant="h6">
-            Find a property and discover your loan options in just a few steps
-          </Subtitle>
-        </Header>
+      <PropertySearch />
 
-        <PropertySearch />
-
-        {selectedProperty && (
-          <>
+      {selectedProperty && (
+        <ContentContainer>
+          <BackButton 
+            startIcon={<ArrowBackIcon />} 
+            onClick={handleBackToSearch}
+            variant="outlined"
+          >
+            Back to property search
+          </BackButton>
+          
+          <StyledComponent>
             <PropertyInsights />
-            <Box sx={{ mt: 4 }}>
+          </StyledComponent>
+          
+          <Box sx={{ mt: 4, width: '100%' }}>
+            <StyledComponent>
               <PropertyFinanceJourney />
-            </Box>
-          </>
-        )}
-      </Container>
+            </StyledComponent>
+          </Box>
+        </ContentContainer>
+      )}
     </PageContainer>
   );
 }; 

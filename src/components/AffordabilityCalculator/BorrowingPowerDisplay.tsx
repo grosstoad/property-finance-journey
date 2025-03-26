@@ -1,4 +1,4 @@
-import { useContext } from 'react';
+import { useContext, useEffect, useState } from 'react';
 import {
   Box,
   Paper,
@@ -51,14 +51,22 @@ export function BorrowingPowerDisplay({
   defaultValue,
   isLoading = false,
 }: BorrowingPowerDisplayProps) {
-  const {
-    maxBorrowingPower,
-    currentLoanAmount,
-  } = useContext(AffordabilityContext);
+  // Local state to manage the slider value
+  const [sliderValue, setSliderValue] = useState(defaultValue);
+  
+  // Update local state when props change
+  useEffect(() => {
+    setSliderValue(defaultValue);
+  }, [defaultValue]);
+  
+  // Initialize with defaultValue (only on first render)
+  useEffect(() => {
+    // No need to call onSliderChange here, it will be called when user moves the slider
+  }, []);
 
   // Ensure we have valid numbers
-  const validMaxBorrowing = maxBorrowingPower || 0;
-  const validCurrent = currentLoanAmount || 0;
+  const validMinValue = minValue || 100000;
+  const validMaxValue = maxValue || 1000000;
 
   if (isLoading) {
     return (
@@ -72,22 +80,26 @@ export function BorrowingPowerDisplay({
     <Box>
       <SliderContainer>
         <Typography variant="h6" gutterBottom>
-          Loan amount: {formatCurrency(validCurrent)}
+          Loan amount: {formatCurrency(sliderValue)}
         </Typography>
         
         <Slider
-          value={validCurrent}
-          min={minValue}
-          max={maxValue}
-          onChange={(_, value) => onSliderChange(value as number)}
+          value={sliderValue}
+          min={validMinValue}
+          max={validMaxValue}
+          onChange={(_, value) => {
+            const newValue = value as number;
+            setSliderValue(newValue);
+            onSliderChange(newValue);
+          }}
           step={1000}
           valueLabelDisplay="auto"
           valueLabelFormat={(value) => formatCurrency(value)}
         />
 
         <SliderLabels>
-          <SliderLabel>{formatCurrency(minValue)}</SliderLabel>
-          <SliderLabel>{formatCurrency(maxValue)}</SliderLabel>
+          <SliderLabel>{formatCurrency(validMinValue)}</SliderLabel>
+          <SliderLabel>{formatCurrency(validMaxValue)}</SliderLabel>
         </SliderLabels>
       </SliderContainer>
     </Box>

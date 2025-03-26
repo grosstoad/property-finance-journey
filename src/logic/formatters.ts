@@ -19,7 +19,18 @@ export const formatCurrency = (value: number): string => {
  * @returns Formatted percentage string
  */
 export const formatPercentage = (value: number, decimalPlaces = 2): string => {
-  return `${(value * 100).toFixed(decimalPlaces)}%`;
+  // Check if the value is already in percentage form (e.g., 6.24 vs 0.0624)
+  // If value is > 1 and < 100, assume it's already a percentage
+  const isAlreadyPercentage = value > 1 && value < 100;
+  
+  // If it's already a percentage, just format it
+  // If not, convert from decimal to percentage
+  const percentValue = isAlreadyPercentage ? value : value * 100;
+  
+  // Round to avoid floating point precision issues
+  const roundedValue = Math.round(percentValue * Math.pow(10, decimalPlaces)) / Math.pow(10, decimalPlaces);
+  
+  return `${roundedValue.toFixed(decimalPlaces)}%`;
 };
 
 /**

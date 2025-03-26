@@ -55,12 +55,14 @@ export const calculateLoanAmount = (
   firstHomeBuyer: boolean,
   postcode: string
 ): LoanAmount => {
-  // Calculate deposit using depositService
-  const depositResult = calculateDepositDetails({
+  // Calculate deposit first to get stamp duty and available deposit
+  const depositResult = calculateLoanDeposit(
     propertyPrice,
     savings,
-    state
-  });
+    state,
+    purpose,
+    firstHomeBuyer
+  );
   
   // Calculate loan amount using depositService
   const loanAmountResult = calculateLoanAmountRequired({

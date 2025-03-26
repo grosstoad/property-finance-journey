@@ -17,6 +17,8 @@ import {
   Paper,
   Grid,
   IconButton,
+  InputAdornment,
+  Divider
 } from '@mui/material';
 import PersonIcon from '@mui/icons-material/Person';
 import PeopleIcon from '@mui/icons-material/People';
@@ -24,6 +26,8 @@ import CloseIcon from '@mui/icons-material/Close';
 import { FinancialsContext } from '../../contexts/FinancialsContext';
 import { ApplicantFinancials, FinancialsInput, FrequencyType } from '../../types/FinancialTypes';
 import { AffordabilityContext } from '../../contexts/AffordabilityContext';
+import { CurrencyTextField } from '../CurrencyTextField';
+import { formatCurrency } from '../../logic/formatters';
 
 interface TabPanelProps {
   children?: React.ReactNode;
@@ -150,39 +154,127 @@ export function FinancialsModal({ open, onClose, onSubmit }: FinancialsModalProp
     const incomeField = data[field] || { value: 0, frequency: 'yearly' as FrequencyType };
 
     return (
-      <Grid container spacing={2} sx={{ mb: 2 }}>
-        <Grid item xs={12}>
-          <Typography variant="subtitle2" gutterBottom>
-            {label}
-          </Typography>
-          <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1 }}>
-            {description}
-          </Typography>
-        </Grid>
-        <Grid item xs={6}>
-          <TextField
-            fullWidth
-            type="number"
-            value={incomeField.value || ''}
-            onChange={(e) => updateApplicantField(applicant, field, 'value', Number(e.target.value) || 0)}
-            InputProps={{ inputProps: { min: 0 } }}
+      <Box sx={{ mb: 2 }}>
+        <Typography variant="subtitle2" gutterBottom>
+          {label}
+        </Typography>
+        <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1 }}>
+          {description}
+        </Typography>
+        
+        <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", mb: 1 }}>
+          <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
+            <Typography variant="body1">Amount</Typography>
+            <CurrencyTextField
+              value={incomeField.value || 0}
+              onChange={(e) => updateApplicantField(applicant, field, 'value', Number(e.target.value) || 0)}
+              variant="outlined"
+              size="small"
+              sx={{ width: "140px" }}
+              InputProps={{
+                startAdornment: <InputAdornment position="start"></InputAdornment>,
+              }}
+            />
+          </Box>
+          
+          <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
+            <Typography variant="body1">Frequency</Typography>
+            <FormControl size="small" sx={{ width: "140px" }}>
+              <Select
+                value={incomeField.frequency}
+                onChange={(e) => updateApplicantField(applicant, field, 'frequency', e.target.value as FrequencyType)}
+              >
+                <MenuItem value="weekly">Weekly</MenuItem>
+                <MenuItem value="fortnightly">Fortnightly</MenuItem>
+                <MenuItem value="monthly">Monthly</MenuItem>
+                <MenuItem value="yearly">Annual</MenuItem>
+              </Select>
+            </FormControl>
+          </Box>
+        </Box>
+        
+        <Divider sx={{ my: 2 }} />
+      </Box>
+    );
+  };
+
+  const renderCreditCardLimitField = () => {
+    return (
+      <Box sx={{ mb: 2 }}>
+        <Typography variant="subtitle2" gutterBottom>
+          Credit Card Limit
+        </Typography>
+        <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1 }}>
+          The total limit across all credit cards
+        </Typography>
+        
+        <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", mb: 1 }}>
+          <Typography variant="body1">Total Credit Card Limit</Typography>
+          <CurrencyTextField
+            value={financials.liabilities.creditCardLimit || 0}
+            onChange={(e) => updateCreditCardLimit(Number(e.target.value) || 0)}
+            variant="outlined"
             size="small"
+            sx={{ width: "140px" }}
+            InputProps={{
+              startAdornment: <InputAdornment position="start"></InputAdornment>,
+            }}
           />
-        </Grid>
-        <Grid item xs={6}>
-          <FormControl fullWidth size="small">
-            <Select
-              value={incomeField.frequency}
-              onChange={(e) => updateApplicantField(applicant, field, 'frequency', e.target.value as FrequencyType)}
-            >
-              <MenuItem value="weekly">Weekly</MenuItem>
-              <MenuItem value="fortnightly">Fortnightly</MenuItem>
-              <MenuItem value="monthly">Monthly</MenuItem>
-              <MenuItem value="yearly">Annual</MenuItem>
-            </Select>
-          </FormControl>
-        </Grid>
-      </Grid>
+        </Box>
+        <Divider sx={{ my: 2 }} />
+      </Box>
+    );
+  };
+
+  const renderLiabilityField = (
+    field: 'expenses' | 'otherHomeLoanRepayments' | 'otherLoanRepayments',
+    label: string,
+    description: string,
+  ) => {
+    const liabilityField = financials.liabilities[field];
+
+    return (
+      <Box sx={{ mb: 2 }}>
+        <Typography variant="subtitle2" gutterBottom>
+          {label}
+        </Typography>
+        <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1 }}>
+          {description}
+        </Typography>
+        
+        <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", mb: 1 }}>
+          <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
+            <Typography variant="body1">Amount</Typography>
+            <CurrencyTextField
+              value={liabilityField.value || 0}
+              onChange={(e) => updateLiabilityField(field, 'value', Number(e.target.value) || 0)}
+              variant="outlined"
+              size="small"
+              sx={{ width: "140px" }}
+              InputProps={{
+                startAdornment: <InputAdornment position="start"></InputAdornment>,
+              }}
+            />
+          </Box>
+          
+          <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
+            <Typography variant="body1">Frequency</Typography>
+            <FormControl size="small" sx={{ width: "140px" }}>
+              <Select
+                value={liabilityField.frequency}
+                onChange={(e) => updateLiabilityField(field, 'frequency', e.target.value as FrequencyType)}
+              >
+                <MenuItem value="weekly">Weekly</MenuItem>
+                <MenuItem value="fortnightly">Fortnightly</MenuItem>
+                <MenuItem value="monthly">Monthly</MenuItem>
+                <MenuItem value="yearly">Annual</MenuItem>
+              </Select>
+            </FormControl>
+          </Box>
+        </Box>
+        
+        <Divider sx={{ my: 2 }} />
+      </Box>
     );
   };
 
@@ -394,128 +486,23 @@ export function FinancialsModal({ open, onClose, onSubmit }: FinancialsModalProp
             Liabilities and Expenses
           </Typography>
 
-          <Grid container spacing={2} sx={{ mb: 2 }}>
-            <Grid item xs={12}>
-              <Typography variant="subtitle2" gutterBottom>
-                Expenses
-              </Typography>
-              <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1 }}>
-                Regular living expenses including utilities, food, etc.
-              </Typography>
-            </Grid>
-            <Grid item xs={6}>
-              <TextField
-                fullWidth
-                type="number"
-                value={financials.liabilities.expenses.value || ''}
-                onChange={(e) => updateLiabilityField('expenses', 'value', Number(e.target.value) || 0)}
-                InputProps={{ inputProps: { min: 0 } }}
-                size="small"
-              />
-            </Grid>
-            <Grid item xs={6}>
-              <FormControl fullWidth size="small">
-                <Select
-                  value={financials.liabilities.expenses.frequency}
-                  onChange={(e) => updateLiabilityField('expenses', 'frequency', e.target.value as FrequencyType)}
-                >
-                  <MenuItem value="weekly">Weekly</MenuItem>
-                  <MenuItem value="fortnightly">Fortnightly</MenuItem>
-                  <MenuItem value="monthly">Monthly</MenuItem>
-                  <MenuItem value="yearly">Annual</MenuItem>
-                </Select>
-              </FormControl>
-            </Grid>
-          </Grid>
+          {renderLiabilityField(
+            'expenses',
+            'Expenses',
+            'Regular living expenses including utilities, food, etc.'
+          )}
+          {renderLiabilityField(
+            'otherHomeLoanRepayments',
+            'Other Home Loan Repayments',
+            'Current repayments for any existing home loans'
+          )}
+          {renderLiabilityField(
+            'otherLoanRepayments',
+            'Other Loan Repayments',
+            'Repayments for personal loans, car loans, etc.'
+          )}
 
-          <Grid container spacing={2} sx={{ mb: 2 }}>
-            <Grid item xs={12}>
-              <Typography variant="subtitle2" gutterBottom>
-                Other Home Loan Repayments
-              </Typography>
-              <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1 }}>
-                Current repayments for any existing home loans
-              </Typography>
-            </Grid>
-            <Grid item xs={6}>
-              <TextField
-                fullWidth
-                type="number"
-                value={financials.liabilities.otherHomeLoanRepayments.value || ''}
-                onChange={(e) => updateLiabilityField('otherHomeLoanRepayments', 'value', Number(e.target.value) || 0)}
-                InputProps={{ inputProps: { min: 0 } }}
-                size="small"
-              />
-            </Grid>
-            <Grid item xs={6}>
-              <FormControl fullWidth size="small">
-                <Select
-                  value={financials.liabilities.otherHomeLoanRepayments.frequency}
-                  onChange={(e) => updateLiabilityField('otherHomeLoanRepayments', 'frequency', e.target.value as FrequencyType)}
-                >
-                  <MenuItem value="weekly">Weekly</MenuItem>
-                  <MenuItem value="fortnightly">Fortnightly</MenuItem>
-                  <MenuItem value="monthly">Monthly</MenuItem>
-                  <MenuItem value="yearly">Annual</MenuItem>
-                </Select>
-              </FormControl>
-            </Grid>
-          </Grid>
-
-          <Grid container spacing={2} sx={{ mb: 2 }}>
-            <Grid item xs={12}>
-              <Typography variant="subtitle2" gutterBottom>
-                Other Loan Repayments
-              </Typography>
-              <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1 }}>
-                Repayments for personal loans, car loans, etc.
-              </Typography>
-            </Grid>
-            <Grid item xs={6}>
-              <TextField
-                fullWidth
-                type="number"
-                value={financials.liabilities.otherLoanRepayments.value || ''}
-                onChange={(e) => updateLiabilityField('otherLoanRepayments', 'value', Number(e.target.value) || 0)}
-                InputProps={{ inputProps: { min: 0 } }}
-                size="small"
-              />
-            </Grid>
-            <Grid item xs={6}>
-              <FormControl fullWidth size="small">
-                <Select
-                  value={financials.liabilities.otherLoanRepayments.frequency}
-                  onChange={(e) => updateLiabilityField('otherLoanRepayments', 'frequency', e.target.value as FrequencyType)}
-                >
-                  <MenuItem value="weekly">Weekly</MenuItem>
-                  <MenuItem value="fortnightly">Fortnightly</MenuItem>
-                  <MenuItem value="monthly">Monthly</MenuItem>
-                  <MenuItem value="yearly">Annual</MenuItem>
-                </Select>
-              </FormControl>
-            </Grid>
-          </Grid>
-
-          <Grid container spacing={2} sx={{ mb: 2 }}>
-            <Grid item xs={12}>
-              <Typography variant="subtitle2" gutterBottom>
-                Credit Card Limit
-              </Typography>
-              <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1 }}>
-                Total limit across all credit cards
-              </Typography>
-            </Grid>
-            <Grid item xs={6}>
-              <TextField
-                fullWidth
-                type="number"
-                value={financials.liabilities.creditCardLimit || ''}
-                onChange={(e) => updateCreditCardLimit(Number(e.target.value) || 0)}
-                InputProps={{ inputProps: { min: 0 } }}
-                size="small"
-              />
-            </Grid>
-          </Grid>
+          {renderCreditCardLimitField()}
         </Box>
       </DialogContent>
 

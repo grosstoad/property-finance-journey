@@ -30,24 +30,22 @@ const FeatureChip = styled(Chip)(({ theme }) => ({
 }));
 
 const PropertyCard = styled(Card)(({ theme }) => ({
-  margin: theme.spacing(2),
+  margin: 0,
   overflow: 'hidden',
   boxShadow: '0px 4px 20px rgba(0, 0, 0, 0.1)',
   borderRadius: theme.shape.borderRadius,
   backgroundColor: '#ffffff',
-  minHeight: 400,
-  display: 'flex',
-  flexDirection: 'column',
+  width: '100%',
   [theme.breakpoints.down('md')]: {
-    minHeight: 'unset',
+    width: '100%'
   }
 }));
 
 const PropertyImage = styled('img')({
   width: '100%',
-  height: '100%',
+  height: '350px',
   objectFit: 'cover',
-  display: 'block',
+  display: 'block'
 });
 
 const PropertyInfo = styled(Box)(({ theme }) => ({
@@ -55,7 +53,7 @@ const PropertyInfo = styled(Box)(({ theme }) => ({
   height: '100%',
   display: 'flex',
   flexDirection: 'column',
-  justifyContent: 'center',
+  gap: theme.spacing(2)
 }));
 
 const PropertyAddress = styled(Typography)(({ theme }) => ({
@@ -167,78 +165,82 @@ export const PropertyInsights = () => {
   const { address, features, valuation, images } = selectedProperty;
 
   return (
-    <PropertyCard>
-      <Grid container sx={{ height: '100%', flexGrow: 1 }}>
-        {/* Left section: Property details */}
-        <Grid item xs={12} md={6} sx={{ height: isTablet ? 'auto' : '100%' }}>
-          <PropertyInfo>
-            <PropertyAddress variant="h4">{address.street}</PropertyAddress>
-            <PropertySuburb variant="h6">{address.suburb} {address.state} {address.postcode}</PropertySuburb>
-            
-            <FeatureChipsContainer>
-              <FeatureChip 
-                icon={<HomeIcon />}
-                label="House" 
-              />
-              <FeatureChip 
-                icon={<BedIcon />}
-                label={features.bedrooms.toString()} 
-              />
-              <FeatureChip 
-                icon={<BathtubIcon />}
-                label={features.bathrooms.toString()} 
-              />
-              <FeatureChip 
-                icon={<DirectionsCarIcon />}
-                label={features.carSpaces.toString()} 
-              />
-              <FeatureChip 
-                icon={<SquareFootIcon />}
-                label={formatSquareMeters(features.landSize)} 
-              />
-              <FeatureChip 
-                icon={<SquareFootIcon />}
-                label={formatSquareMeters(features.buildingSize)} 
-              />
-            </FeatureChipsContainer>
-            
-            <Divider />
-            
-            <ValuationSection>
-              {/* Single valuation bar with values inside */}
-              <ValuationContainer>
-                <ValuationBar>
-                  <SideValue isMobile={isMobile}>{formatCurrency(valuation.low)}</SideValue>
-                  <ValuationValue>
-                    {formatCurrency(valuation.mid)}
-                  </ValuationValue>
-                  <SideValue isMobile={isMobile}>{formatCurrency(valuation.high)}</SideValue>
-                </ValuationBar>
+    <Box sx={{ width: '100%' }}>
+      <PropertyCard>
+        <Grid container>
+          {/* Left section: Property details */}
+          <Grid item xs={12} md={6}>
+            <PropertyInfo>
+              <Box>
+                <PropertyAddress variant="h4">{address.street}</PropertyAddress>
+                <PropertySuburb variant="h6">{address.suburb} {address.state} {address.postcode}</PropertySuburb>
                 
-                {/* Text labels */}
-                <ValuationLabels>
-                  <ValueMarker>Low</ValueMarker>
-                  <EstimatedValueText>
-                    <Typography variant="body2" component="span">
-                      Estimated value
-                    </Typography>
-                    <ConfidenceIndicator level={valuation.confidenceLevel} />
-                  </EstimatedValueText>
-                  <ValueMarker>High</ValueMarker>
-                </ValuationLabels>
-              </ValuationContainer>
-            </ValuationSection>
-          </PropertyInfo>
+                <FeatureChipsContainer>
+                  <FeatureChip 
+                    icon={<HomeIcon />}
+                    label="House" 
+                  />
+                  <FeatureChip 
+                    icon={<BedIcon />}
+                    label={features.bedrooms.toString()} 
+                  />
+                  <FeatureChip 
+                    icon={<BathtubIcon />}
+                    label={features.bathrooms.toString()} 
+                  />
+                  <FeatureChip 
+                    icon={<DirectionsCarIcon />}
+                    label={features.carSpaces.toString()} 
+                  />
+                  <FeatureChip 
+                    icon={<SquareFootIcon />}
+                    label={formatSquareMeters(features.landSize)} 
+                  />
+                  <FeatureChip 
+                    icon={<SquareFootIcon />}
+                    label={formatSquareMeters(features.buildingSize)} 
+                  />
+                </FeatureChipsContainer>
+              </Box>
+              
+              <Divider />
+              
+              <ValuationSection>
+                {/* Single valuation bar with values inside */}
+                <ValuationContainer>
+                  <ValuationBar>
+                    <SideValue isMobile={isMobile}>{formatCurrency(valuation.low)}</SideValue>
+                    <ValuationValue>
+                      {formatCurrency(valuation.mid)}
+                    </ValuationValue>
+                    <SideValue isMobile={isMobile}>{formatCurrency(valuation.high)}</SideValue>
+                  </ValuationBar>
+                  
+                  {/* Text labels */}
+                  <ValuationLabels>
+                    <ValueMarker>Low</ValueMarker>
+                    <EstimatedValueText>
+                      <Typography variant="body2" component="span">
+                        Estimated value
+                      </Typography>
+                      <ConfidenceIndicator level={valuation.confidenceLevel} />
+                    </EstimatedValueText>
+                    <ValueMarker>High</ValueMarker>
+                  </ValuationLabels>
+                </ValuationContainer>
+              </ValuationSection>
+            </PropertyInfo>
+          </Grid>
+          
+          {/* Right section: Property image */}
+          <Grid item xs={12} md={6}>
+            <PropertyImage 
+              src="https://images.unsplash.com/photo-1568605114967-8130f3a36994?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1470&q=80" 
+              alt={address.fullAddress} 
+            />
+          </Grid>
         </Grid>
-        
-        {/* Right section: Property image */}
-        <Grid item xs={12} md={6} sx={{ height: isTablet ? 300 : '100%', display: 'flex' }}>
-          <PropertyImage 
-            src="https://images.unsplash.com/photo-1568605114967-8130f3a36994?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1470&q=80" 
-            alt={address.fullAddress} 
-          />
-        </Grid>
-      </Grid>
-    </PropertyCard>
+      </PropertyCard>
+    </Box>
   );
 }; 

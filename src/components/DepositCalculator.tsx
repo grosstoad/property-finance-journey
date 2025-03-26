@@ -12,7 +12,8 @@ import {
   Grid, 
   Paper, 
   Divider,
-  Button
+  Button,
+  InputAdornment
 } from '@mui/material';
 import { SelectChangeEvent } from '@mui/material/Select';
 import { calculateDepositDetails, calculateLoanAmountRequired } from '../logic/depositService';
@@ -20,6 +21,7 @@ import { LoanPurpose } from '../types/loan';
 import { AustralianState } from '../types/stampDuty';
 import { INPUT_DEBOUNCE_TIME } from '../constants/defaultValues';
 import { formatCurrency } from '../logic/formatters';
+import { CurrencyTextField } from './CurrencyTextField';
 
 /**
  * Deposit Calculator Component
@@ -181,27 +183,35 @@ export const DepositCalculator: React.FC = () => {
           <Box sx={{ p: 2 }}>
             <Typography variant="h6" gutterBottom>Property Details</Typography>
             
-            <TextField
-              fullWidth
-              label="Property Price"
-              type="number"
-              value={propertyPrice}
-              onChange={handlePropertyPriceChange}
-              error={!!errors.propertyPrice}
-              helperText={errors.propertyPrice}
-              sx={{ mb: 2 }}
-            />
+            {/* Property Price Input */}
+            <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", mb: 2 }}>
+              <Typography variant="body1">Property Price</Typography>
+              <CurrencyTextField
+                value={propertyPrice}
+                onChange={handlePropertyPriceChange}
+                variant="outlined"
+                size="small"
+                sx={{ width: "140px" }}
+                InputProps={{
+                  startAdornment: <InputAdornment position="start"></InputAdornment>,
+                }}
+              />
+            </Box>
             
-            <TextField
-              fullWidth
-              label="Savings"
-              type="number"
-              value={savings}
-              onChange={handleSavingsChange}
-              error={!!errors.savings}
-              helperText={errors.savings}
-              sx={{ mb: 2 }}
-            />
+            {/* Savings Input */}
+            <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", mb: 2 }}>
+              <Typography variant="body1">Savings</Typography>
+              <CurrencyTextField
+                value={savings}
+                onChange={handleSavingsChange}
+                variant="outlined"
+                size="small"
+                sx={{ width: "140px" }}
+                InputProps={{
+                  startAdornment: <InputAdornment position="start"></InputAdornment>,
+                }}
+              />
+            </Box>
             
             <FormControl fullWidth sx={{ mb: 2 }}>
               <InputLabel>State</InputLabel>
