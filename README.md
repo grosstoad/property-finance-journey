@@ -1,14 +1,90 @@
 # Property Finance Journey
 
-A React application for property finance calculations and PropTrack API integration.
+A comprehensive property finance calculator that helps users understand their borrowing power and explore loan options.
 
 ## Features
 
-- Property search via PropTrack API
-- Property information display
-- Loan calculation tools
-- Address suggestions and autocomplete
-- Property attributes display
+- **Affordability Calculator**
+  - Real-time borrowing power calculation
+  - Dynamic LVR-based interest rates
+  - Personalized improvement suggestions
+  - Interactive slider for loan amount exploration
+
+- **Financial Assessment**
+  - Income shading based on income type
+  - HEM (Household Expenditure Measure) integration
+  - Credit commitment assessment
+  - Buffered serviceability calculation
+
+- **Deposit Calculator**
+  - Stamp duty calculation by state
+  - First home buyer concessions
+  - Upfront costs estimation
+  - LVR band optimization
+
+- **Loan Options**
+  - Product matching based on LVR
+  - Interest rate customization
+  - Repayment calculation
+  - Feature comparison
+
+## Technical Documentation
+
+For detailed information about the core calculations and logic, see:
+- [Technical Calculations Documentation](docs/TECHNICAL_CALCULATIONS.md)
+
+## Project Structure
+
+```
+src/
+├── components/          # React components
+│   ├── AffordabilityCalculator/
+│   ├── FinancialsModal/
+│   └── PropertyFinanceJourney/
+├── logic/              # Business logic
+│   ├── maxBorrow/      # Borrowing calculations
+│   ├── hemService.ts   # HEM calculations
+│   └── taxService.ts   # Tax calculations
+├── types/              # TypeScript types
+├── constants/          # Configuration
+└── contexts/           # React contexts
+```
+
+## Getting Started
+
+1. Install dependencies:
+   ```bash
+   npm install
+   ```
+
+2. Start development server:
+   ```bash
+   npm run dev
+   ```
+
+3. Run tests:
+   ```bash
+   npm test
+   ```
+
+## Technology Stack
+
+- React + TypeScript
+- Material UI
+- Vite
+- Jest + React Testing Library
+
+## Contributing
+
+1. Fork the repository
+2. Create your feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'feat: Add amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
+
+## License
+
+This project is licensed under the MIT License - see the LICENSE file for details.
 
 ## React + TypeScript + Vite
 
@@ -29,16 +105,6 @@ To use the PropTrack API integration:
 VITE_PROPTRACK_API_KEY=your_api_key_here
 VITE_PROPTRACK_API_SECRET=your_api_secret_here
 VITE_PROPTRACK_API_URL=https://data.proptrack.com
-```
-
-## Development
-
-```bash
-# Install dependencies
-npm install
-
-# Start development server
-npm run dev
 ```
 
 ## Expanding the ESLint configuration
