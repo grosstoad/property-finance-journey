@@ -62,6 +62,7 @@ export const PropertyFinanceJourney: React.FC<PropertyFinanceJourneyProps> = ({ 
   const [originalFinancials, setOriginalFinancials] = useState<FinancialsInput | null>(null); // State for original financials
   const [originalSavings, setOriginalSavings] = useState<number | null>(null); // Store original savings for revert
   const [visualisationState, setVisualisationState] = useState<VisualisationState | null>(null);
+  const [currentSliderPropertyValue, setCurrentSliderPropertyValue] = useState<number | null>(null); // New state for slider value
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
   
@@ -537,43 +538,62 @@ export const PropertyFinanceJourney: React.FC<PropertyFinanceJourneyProps> = ({ 
     setOriginalFinancials // Add setter
   ]); // Corrected dependency array syntax
 
+  // Handler for slider updates from AffordabilityCard_2
+  const handleSliderPropertyValueChange = useCallback((newValue: number) => {
+    console.log(`[PFJ] Slider value changed: ${newValue}`);
+    setCurrentSliderPropertyValue(newValue);
+    // Note: We don't directly trigger calculateVisualisationState here.
+    // Instead, we'll modify calculateVisualisationState to use currentSliderPropertyValue if available.
+  }, []); // No complex dependencies needed
+
   // *** Central Calculation Function ***
   const calculateVisualisationState = useCallback((): VisualisationState | null => {
     console.log("[calculateVisualisationState] Running calculation...");
+
+    // Check prerequisites first (excluding basePropertyValueForCalc initially)
     if (!hasCalculatedAffordability || !financials || !selectedProperty || !depositDetails || maxBorrowingPower <= 0) {
-      console.log("[calculateVisualisationState] Missing prerequisites, returning null.");
-      return null; // Not ready to calculate
+        console.log("[calculateVisualisationState] Missing primary prerequisites, returning null.", {
+            hasCalculatedAffordability,
+            financials: !!financials,
+            selectedProperty: !!selectedProperty,
+            depositDetails: !!depositDetails,
+            maxBorrowingPower
+        });
+        return null; // Not ready to calculate
     }
 
     // --- Recalculate Max Affordable Property Value (Iterative) ---
-    // This logic might be similar to the old maxPropertyValue useMemo
+    // This remains the same, calculating the *theoretical max*
     let iterativeMaxPropValue = 0;
     try {
-        let currentEstimate = maxBorrowingPower + depositDetails.savings;
-        let previousEstimate = 0;
-        let iterations = 0;
-        while (Math.abs(currentEstimate - previousEstimate) > 100 && iterations < 10) {
-          previousEstimate = currentEstimate;
-          const costs = depositService.calculateDepositComponents(currentEstimate, selectedProperty.address.state, isFirstHomeBuyer, loanPurpose === 'INVESTMENT');
-          const availableDeposit = Math.max(0, depositDetails.savings - (costs.stampDuty + costs.legalFees + costs.otherUpfrontCosts));
-          currentEstimate = maxBorrowingPower + availableDeposit;
-          iterations++;
-        }
-        iterativeMaxPropValue = currentEstimate;
-        console.log(`[calculateVisualisationState] Iterative Max Prop Value: ${formatCurrency(iterativeMaxPropValue)}`)
+      let currentEstimate = maxBorrowingPower + depositDetails.savings;
+      let previousEstimate = 0;
+      let iterations = 0;
+      while (Math.abs(currentEstimate - previousEstimate) > 100 && iterations < 10) {
+        previousEstimate = currentEstimate;
+        const costs = depositService.calculateDepositComponents(currentEstimate, selectedProperty.address.state, isFirstHomeBuyer, loanPurpose === 'INVESTMENT');
+        const availableDeposit = Math.max(0, depositDetails.savings - (costs.stampDuty + costs.legalFees + costs.otherUpfrontCosts));
+        currentEstimate = maxBorrowingPower + availableDeposit;
+        iterations++;
+      }
+      iterativeMaxPropValue = currentEstimate;
+      console.log(`[calculateVisualisationState] Iterative Max Prop Value: ${formatCurrency(iterativeMaxPropValue)}`)
     } catch (error) {
-        console.error("Error calculating iterative max property value:", error);
-        iterativeMaxPropValue = selectedProperty.valuation.mid * 1.2; // Fallback
+      console.error("Error calculating iterative max property value:", error);
+      iterativeMaxPropValue = selectedProperty.valuation.mid * 1.2; // Fallback
     }
-    
-    // --- Determine Initial Display Property Value ---
-    // Calculate costs based on the *original desired* property price for context
+
+    // --- Determine Initial Display Property Value (based on affordability) ---
     const initialCosts = depositService.calculateDepositComponents(selectedProperty.valuation.mid, selectedProperty.address.state, isFirstHomeBuyer, loanPurpose === 'INVESTMENT');
     const initialAvailableDeposit = Math.max(0, depositDetails.savings - (initialCosts.stampDuty + initialCosts.legalFees + initialCosts.otherUpfrontCosts));
     const requiredLoan = Math.max(selectedProperty.valuation.mid - initialAvailableDeposit, 0);
     const isAffordable = maxBorrowingPower >= requiredLoan;
-    const displayPropertyValue = isAffordable ? selectedProperty.valuation.mid : iterativeMaxPropValue;
-    console.log(`[calculateVisualisationState] Is Affordable: ${isAffordable}, Display Prop Value: ${formatCurrency(displayPropertyValue)}`);
+    const initialDisplayPropertyValue = isAffordable ? selectedProperty.valuation.mid : iterativeMaxPropValue;
+    console.log(`[calculateVisualisationState] Initial Affordable: ${isAffordable}, Initial Display Prop Value: ${formatCurrency(initialDisplayPropertyValue)}`);
+
+    // --- Determine Property Value to Use (Slider overrides initial) ---
+    const displayPropertyValue = currentSliderPropertyValue ?? initialDisplayPropertyValue;
+    console.log(`[calculateVisualisationState] Using Property Value for Calculation: ${formatCurrency(displayPropertyValue)}`);
 
     // --- Calculate Loan Amount (Constrained) ---
     const displayCosts = depositService.calculateDepositComponents(displayPropertyValue, selectedProperty.address.state, isFirstHomeBuyer, loanPurpose === 'INVESTMENT');
@@ -626,15 +646,16 @@ export const PropertyFinanceJourney: React.FC<PropertyFinanceJourneyProps> = ({ 
       needsRecalculation: false // Reset flag after calculation
     };
 
-  }, [ // Dependencies for the calculation function itself
+  }, [
       hasCalculatedAffordability,
-      financials, 
-      selectedProperty, 
-      depositDetails, 
-      maxBorrowingPower, 
-      loanPurpose, 
-      isFirstHomeBuyer, 
-      loanPreferences
+      financials,
+      selectedProperty,
+      depositDetails,
+      maxBorrowingPower,
+      loanPurpose,
+      isFirstHomeBuyer,
+      loanPreferences,
+      currentSliderPropertyValue
   ]);
 
   // *** Effect to run the central calculation ***
@@ -795,6 +816,7 @@ export const PropertyFinanceJourney: React.FC<PropertyFinanceJourneyProps> = ({ 
             desiredPropertyValue={selectedProperty.valuation.mid} // Pass original desired price for alert
             onEditLoanPreferences={handleConfigureClick}
             onApplySuggestion={handleApplySuggestion}
+            onPropertyValueChange={handleSliderPropertyValueChange} // Pass down the new handler
             // Remove props that are now passed within the calculated state
             // baseInterestRate={...}
             // selectedProduct={...}

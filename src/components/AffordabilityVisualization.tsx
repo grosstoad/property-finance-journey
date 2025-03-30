@@ -45,6 +45,7 @@ interface AffordabilityVisualizationProps {
   monthlyRepayment: number;
   minPropertyValue: number;
   maxPropertyValue: number;
+  onPropertyValueChange: (value: number) => void;
 
   // REMOVED (Now part of calculated state passed in)
   // baseInterestRate: number;
@@ -75,7 +76,8 @@ export function AffordabilityVisualization({
   productDetails,
   monthlyRepayment,
   minPropertyValue,
-  maxPropertyValue
+  maxPropertyValue,
+  onPropertyValueChange
 }: AffordabilityVisualizationProps) {
   try {
     // REMOVE internal state that duplicates props:
@@ -163,7 +165,7 @@ export function AffordabilityVisualization({
               minPropertyValue={minPropertyValue} // Pass calculated min
               maxPropertyValue={maxPropertyValue} // Pass calculated max
               savings={savings}
-              // onChange={handlePropertyValueChange} // Slider change needs rethinking - maybe pass up to parent?
+              onChange={onPropertyValueChange} // Pass the handler to the card
               propertyState={propertyState}
               isFirstHomeBuyer={isFirstHomeBuyer}
               isInvestmentProperty={isInvestmentProperty}

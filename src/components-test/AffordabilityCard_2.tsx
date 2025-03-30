@@ -184,7 +184,7 @@ export function AffordabilityCard_2({
     };
   }, [propertyValue, loanAmountProp, depositProp, stampDutyProp, upfrontCostsProp]);
 
-  // Handle slider change - immediately update UI as user drags
+  // Handle slider change - immediately update UI and notify parent
   const handleSliderChange = (
     _event: React.SyntheticEvent | Event,
     newValue: number | number[]
@@ -197,20 +197,24 @@ export function AffordabilityCard_2({
         return;
       }
       
-      // Log only significant changes (every $50k) to reduce console noise
-      if (Math.abs(value - propertyValue) >= 50000) {
-        console.log(`[SLIDER] Value changed to: ${formatCurrency(value)}`);
-      }
-      
-      // Update local state immediately for responsive UI
+      // Update local state immediately for responsive UI (text input)
       setPropertyValue(value);
       setInputValue(formatCurrency(value));
+
+      // Notify parent of the change immediately
+      if (onChange) {
+        // Log only significant changes (every $50k) to reduce console noise
+        if (Math.abs(value - propertyValue) >= 50000) { // Check against previous propertyValue state for logging
+          console.log(`[SLIDER] Notifying parent of value change: ${formatCurrency(value)}`);
+        }
+        onChange(value);
+      }
     } catch (error) {
       console.error("Error handling slider change:", error);
     }
   };
   
-  // Handle slider change completion - notify parent and ensure constraints
+  // Handle slider change completion - ensures final value is set, potentially redundant
   const handleSliderChangeEnd = (
     _event: React.SyntheticEvent | Event,
     newValue: number | number[]
@@ -321,7 +325,7 @@ export function AffordabilityCard_2({
         <Slider
           value={propertyValue}
           onChange={handleSliderChange}
-          onChangeCommitted={handleSliderChangeEnd}
+          // onChangeCommitted={handleSliderChangeEnd} // Keep or remove onChangeCommitted based on need
           min={minPropertyValue}
           max={maxPropertyValue}
           step={10000}
