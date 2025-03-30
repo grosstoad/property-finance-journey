@@ -145,6 +145,17 @@ export const calculateDepositComponents = (
     isInvestmentProperty
   });
 
+  // Validate propertyValue to ensure it's not negative
+  if (typeof propertyValue !== 'number' || isNaN(propertyValue) || propertyValue < 0) {
+    console.error(`Invalid property value: ${propertyValue}, using safe default of 0`);
+    // Return safe default values instead of throwing an error
+    return {
+      stampDuty: 0,
+      legalFees: 0,
+      otherUpfrontCosts: 0
+    };
+  }
+
   // Calculate stamp duty
   const stampDutyResult = calculateStampDuty({
     propertyPrice: propertyValue,

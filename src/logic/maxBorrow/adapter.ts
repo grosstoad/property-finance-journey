@@ -55,7 +55,7 @@ function mapConstraintReason(reason: MaxBorrowConstraint): 'deposit' | 'financia
 /**
  * Adapter function to make the new implementation compatible with the old interface
  */
-export function calculateMaxBorrowing(
+export async function calculateMaxBorrowing(
   financials: FinancialsInput,
   loanProductDetails: LoanProductDetails,
   propertyPrice: number,
@@ -66,8 +66,9 @@ export function calculateMaxBorrowing(
   isFirstHomeBuyer: boolean,
   requiredLoanAmount: number = 0,
   hasOwnHomeComponent: boolean = false,
-  loanPreferences?: LoanPreferences
-): MaxBorrowingResult {
+  loanPreferences?: LoanPreferences,
+  calculateScenarios: boolean = true
+): Promise<MaxBorrowingResult> {
   // Call the new implementation
   const result = newCalculateMaxBorrowing(
     financials,
@@ -125,8 +126,46 @@ export function calculateMaxBorrowing(
     // Map loan scenario
     loanAmountRequiredScenario: mapLoanScenario(
       (result as any).loanScenario || 'STRAIGHT_UP_POWER_UP_FIXED' as NewLoanScenario
-    )
+    ),
+    // Initialize scenarios and appliedScenarioIds as empty arrays initially
+    scenarios: [],
+    appliedScenarioIds: [],
+    // Keep deprecated fields null/undefined for now
+    appliedSuggestions_DEPRECATED: undefined,
+    suggestionImpacts_DEPRECATED: undefined,
+    baseBorrowingAmount: result.maxBorrowAmount // Base amount is the initial calculation
   };
+  
+  // Calculate improvement scenarios if requested
+  if (calculateScenarios) {
+    try {
+      // Dynamically import to avoid circular dependency issues at module load time
+      const { calculateImprovementScenarios } = await import('../calculateImprovementScenarios');
+      
+      adaptedResult.scenarios = await calculateImprovementScenarios(
+        financials,
+        adaptedResult, // Pass the partially adapted result
+        loanProductDetails,
+        savings,
+        propertyPrice, // Use original property price for scenario context
+        propertyState,
+        propertyPostcode,
+        isFirstHomeBuyer,
+        isInvestmentProperty,
+        requiredLoanAmount,
+        loanPreferences
+      );
+      // For now, appliedScenarioIds remains empty until we implement the logic
+      // to track applied suggestions within the main journey component.
+      // adaptedResult.appliedScenarioIds = ... // Logic to get applied IDs needed here
+      
+      console.log('[ADAPTER] Improvement scenarios calculated:', adaptedResult.scenarios);
+    } catch (error) {
+      console.error('[ADAPTER] Error calculating improvement scenarios:', error);
+      adaptedResult.scenarios = []; // Ensure it's an empty array on error
+      adaptedResult.appliedScenarioIds = [];
+    }
+  }
   
   return adaptedResult;
 } 

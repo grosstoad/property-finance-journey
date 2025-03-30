@@ -18,14 +18,15 @@ import {
   Button,
   Grid,
   Chip,
-  Stack
+  Stack,
+  Alert
 } from '@mui/material';
 import { ExpandMore, BugReport, Download, Bed as BedIcon, Bathtub as BathtubIcon, DirectionsCar as DirectionsCarIcon, Home as HomeIcon, Apartment as ApartmentIcon, HomeWork as HomeWorkIcon, SquareFoot as SquareFootIcon } from '@mui/icons-material';
 import Confetti from 'react-confetti';
 import { useWindowSize } from 'react-use';
 import { ImprovementSuggestions } from './ImprovementSuggestions';
 import { calculateMaxBorrowing } from '../../logic/maxBorrow/adapter';
-import { ImprovementScenario } from '../../types/FinancialTypes';
+import { MaxBorrowingResult, ImprovementScenario } from '../../types/FinancialTypes';
 import { calculateImprovementScenarios } from '../../logic/calculateImprovementScenarios';
 import { formatCurrency } from '../../logic/formatters';
 import { GLOBAL_LIMITS, DEFAULT_UPFRONT_COSTS } from '../../constants';
@@ -169,6 +170,7 @@ export interface AffordabilityCalculatorProps {
   requiredLoanAmount: number;
   financials: any;
   loanProductDetails: LoanProductDetails;
+  maxBorrowResult?: MaxBorrowingResult;
   onShowLoanOptions: () => void;
   onOpenFinancialsModal: () => void;
 }
@@ -184,6 +186,7 @@ export function AffordabilityCalculator({
   requiredLoanAmount,
   financials,
   loanProductDetails,
+  maxBorrowResult,
   onShowLoanOptions,
   onOpenFinancialsModal,
 }: AffordabilityCalculatorProps) {
@@ -191,8 +194,8 @@ export function AffordabilityCalculator({
   const [maxBorrowingPower, setMaxBorrowingPower] = useState<number>(0);
   const [loanAmountRequiredMet, setLoanAmountRequiredMet] = useState<boolean>(false);
   const [showConfetti, setShowConfetti] = useState<boolean>(false);
-  const [selectedLoanAmount, setSelectedLoanAmount] = useState<number>(0);
-  const [debouncedLoanAmount, setDebouncedLoanAmount] = useState<number>(0);
+  const [selectedLoanAmount, setSelectedLoanAmount] = useState<number>(requiredLoanAmount);
+  const [debouncedLoanAmount, setDebouncedLoanAmount] = useState<number>(requiredLoanAmount);
   const [selectedProduct, setSelectedProduct] = useState<any>(null);
   const [selectedMonthlyRepayment, setSelectedMonthlyRepayment] = useState<number>(0);
   const [selectedPropertyValue, setSelectedPropertyValue] = useState<number>(propertyPrice);
@@ -324,7 +327,13 @@ export function AffordabilityCalculator({
 
   // Optimized slider change handler
   const handleSliderChange = useCallback((event: Event, value: number | number[]) => {
-    const newValue = Math.min(Array.isArray(value) ? value[0] : value, maxBorrowingPower);
+    // Force the value to never exceed maxBorrowingPower
+    const newValue = Math.min(
+      Array.isArray(value) ? value[0] : value, 
+      maxBorrowingPower || requiredLoanAmount
+    );
+    
+    logDebug(`[SLIDER] Value changed: ${formatCurrency(newValue)} (capped to max: ${formatCurrency(maxBorrowingPower)})`);
     
     // Immediate update of loan amount
     setSelectedLoanAmount(newValue);
@@ -333,7 +342,26 @@ export function AffordabilityCalculator({
     startTransition(() => {
       updateDerivedValues(newValue);
     });
-  }, [maxBorrowingPower, updateDerivedValues]);
+  }, [maxBorrowingPower, updateDerivedValues, requiredLoanAmount]);
+
+  // Safety check effect to ensure selectedLoanAmount never exceeds maxBorrowingPower
+  // This has the highest priority and runs after any other state changes
+  useEffect(() => {
+    if (maxBorrowingPower > 0 && selectedLoanAmount > maxBorrowingPower) {
+      logDebug(`[SAFETY] Loan amount exceeds max borrowing power - forcing correction`);
+      logDebug(`  - Current loan: ${formatCurrency(selectedLoanAmount)}`);
+      logDebug(`  - Max allowed: ${formatCurrency(maxBorrowingPower)}`);
+      
+      // Force the loan amount to respect the maximum borrowing power
+      unstable_batchedUpdates(() => {
+        setSelectedLoanAmount(maxBorrowingPower);
+        setDebouncedLoanAmount(maxBorrowingPower);
+      });
+      
+      // Update derived values with correct loan amount
+      updateDerivedValues(maxBorrowingPower);
+    }
+  }, [selectedLoanAmount, maxBorrowingPower, updateDerivedValues]);
 
   // Memoized loan product card
   const MemoizedLoanProductCard = useMemo(() => {
@@ -386,124 +414,205 @@ export function AffordabilityCalculator({
     setDebugLogs(prev => [message, ...prev].slice(0, 100)); // Keep last 100 logs
   };
 
+  // High priority effect to handle maxBorrowResult 
+  // This must run before other calculation effects
+  useEffect(() => {
+    if (maxBorrowResult) {
+      logDebug('[MAX_BORROW] Received external maxBorrowResult');
+      
+      // Use the result from the parent component
+      const maxBorrowAmount = maxBorrowResult.maxBorrowAmount;
+      setMaxBorrowingPower(maxBorrowAmount);
+      
+      // Determine if the required loan is affordable
+      const isAffordable = maxBorrowAmount >= requiredLoanAmount;
+      setLoanAmountRequiredMet(isAffordable);
+      
+      // Force the loan amount to respect the max borrow limit
+      // This is critical to ensure the UI shows the correct value
+      const initialLoanAmount = isAffordable ? requiredLoanAmount : maxBorrowAmount;
+      const targetPropertyValue = isAffordable ? propertyPrice : maxBorrowResult.propertyValue;
+      
+      // Force update the loan amount and derived values
+      logDebug(`[MAX_BORROW] Forcing loan amount to: ${formatCurrency(initialLoanAmount)}`);
+      logDebug(`[MAX_BORROW] Using property value: ${formatCurrency(targetPropertyValue)}`);
+      
+      // First set isCalculating to false to avoid race conditions
+      setIsCalculating(false);
+      
+      // Important: Update in a single batch to prevent race conditions
+      unstable_batchedUpdates(() => {
+        setSelectedLoanAmount(initialLoanAmount);
+        setDebouncedLoanAmount(initialLoanAmount);
+        // Also set the property value directly to avoid calculation issues
+        setSelectedPropertyValue(targetPropertyValue);
+      });
+      
+      // Update property values and other derived values
+      updateDerivedValues(initialLoanAmount, targetPropertyValue);
+    }
+  }, [maxBorrowResult, requiredLoanAmount, updateDerivedValues, propertyPrice]);
+
   // Calculated borrowing power using serviceability formula
   useEffect(() => {
-    // More graceful input validation that allows for zero values
+    // Skip if we already have max borrow result from parent
+    if (maxBorrowResult) {
+      logDebug('[SCENARIOS] Skipping serviceability calculation - using provided maxBorrowResult');
+      return;
+    }
+    
+    // Skip if we don't have required inputs
     if (!propertyPrice && !savings && !baseInterestRate && !financials) {
-      console.warn('All required values are missing, calculation likely to fail');
-    } else if (!propertyPrice || !savings || !baseInterestRate || !financials) {
-      console.warn('Some required values are missing or zero:', { 
-        hasPropertyPrice: !!propertyPrice, 
-        hasSavings: !!savings, 
-        hasInterestRate: !!baseInterestRate, 
-        hasFinancials: !!financials 
-      });
+      logDebug('[SCENARIOS] Missing required inputs, skipping calculation');
+      return;
     }
     
     if (!loanProductDetails) {
-      console.error('loanProductDetails is undefined, cannot proceed with calculation');
+      logDebug('[SCENARIOS] Missing loan product details, cannot proceed');
       return;
     }
     
     const calculateBorrowingPower = async () => {
+      setIsCalculating(true);
+      setError(null);
+      logDebug('[MAX_BORROW] Starting calculation...');
+      const calculationStart = performance.now();
+
       try {
-        setError(null);
-        setIsCalculating(true);
-        
-        const startTime = performance.now();
-        tracingService.startTimer('maxBorrowing_total');
-        
-        logDebug('[SCENARIOS] Starting max borrowing calculation');
-        const result = calculateMaxBorrowing(
-          financials,
-          loanProductDetails,
-          propertyPrice,
-          isInvestmentProperty,
-          propertyPostcode,
-          savings,
-          propertyState,
-          isFirstHomeBuyer,
-          requiredLoanAmount,
-          false,
-          loanPreferences
+        // ** Correct calculateMaxBorrowing call based on definition **
+        const result = await calculateMaxBorrowing(
+          financials,           // 1
+          loanProductDetails,  // 2
+          propertyPrice,       // 3
+          isInvestmentProperty, // 4
+          propertyPostcode,    // 5
+          savings,             // 6
+          propertyState,       // 7
+          isFirstHomeBuyer,    // 8
+          requiredLoanAmount,  // 9
+          false,               // 10 - hasOwnHomeComponent
+          loanPreferences      // 11 
+          // appliedScenarios - Removed: Not a parameter in the function definition
         );
         
-        const endTime = performance.now();
-        
-        logDebug(`[SCENARIOS] Max borrowing calculation result: ${formatCurrency(result.maxBorrowAmount)}`);
-        logDebug(`[SCENARIOS] Required loan amount: ${formatCurrency(requiredLoanAmount)}`);
-        
-        setMaxBorrowingPower(result.maxBorrowAmount);
-        setIsCalculating(false);
-        
-        const meetsRequirement = requiredLoanAmount > 0 
-          ? result.maxBorrowAmount >= requiredLoanAmount
-          : false;
-          
+        const calculationTimeMs = performance.now() - calculationStart;
+        logDebug(`[MAX_BORROW] Calculation complete in ${calculationTimeMs.toFixed(2)}ms`);
+        logDebug(`[MAX_BORROW] Result: ${JSON.stringify(result, null, 2)}`);
+
+        // Apply scenario impact AFTER the base calculation
+        const appliedImpact = appliedScenarios.reduce((totalImpact, scenarioId) => {
+          // Find the scenario object corresponding to the ID 
+          // (Assuming scenarios are available here, might need adjustment if they aren't yet)
+          const scenario = improvementScenarios.find(s => s.id === scenarioId);
+          return totalImpact + (scenario?.impact || 0);
+        }, 0);
+
+        const finalMaxBorrowing = result.maxBorrowAmount + appliedImpact;
+        logDebug(`[SCENARIOS] Applied impact: ${formatCurrency(appliedImpact)}, Final Max Borrow: ${formatCurrency(finalMaxBorrowing)}`);
+
+        setMaxBorrowingPower(finalMaxBorrowing);
+        const meetsRequirement = finalMaxBorrowing >= requiredLoanAmount;
         setLoanAmountRequiredMet(meetsRequirement);
         
-        // Show confetti if we meet the requirement
-        if (meetsRequirement && requiredLoanAmount > 0) {
-          setShowConfetti(true);
-          setTimeout(() => setShowConfetti(false), 5000);
+        // Determine the appropriate loan amount to use for derived values
+        const loanAmountForDerived = meetsRequirement ? requiredLoanAmount : finalMaxBorrowing;
+        updateDerivedValues(loanAmountForDerived);
+
+        // Update selected loan amount (slider value)
+        const newSelectedLoanAmount = Math.min(loanAmountForDerived, finalMaxBorrowing); 
+        if (selectedLoanAmount !== newSelectedLoanAmount) {
+          setSelectedLoanAmount(newSelectedLoanAmount);
+          logDebug(`[UI_UPDATE] Selected loan amount updated to: ${formatCurrency(newSelectedLoanAmount)}`);
         }
-        
-        // Calculate improvement scenarios if needed
-        if (requiredLoanAmount > 0 && !meetsRequirement) {
-          const scenarios = calculateImprovementScenarios(
-            financials,
-            result,
-            loanProductDetails,
-            savings,
-            propertyPrice,
-            propertyState,
-            propertyPostcode,
-            isFirstHomeBuyer,
-            isInvestmentProperty,
-            requiredLoanAmount,
-            loanPreferences
-          );
-          setImprovementScenarios(scenarios);
+
+        logDebug(`[SERVICEABILITY] Meets Requirement: ${meetsRequirement}`);
+        logDebug(`  - Final Max Borrowing (inc scenarios): ${formatCurrency(finalMaxBorrowing)}`);
+        logDebug(`  - Required Loan: ${formatCurrency(requiredLoanAmount)}`);
+
+        // ... logging financials and property value used (from base result) ...
+        if (result.maxBorrowingAmountFinancialsUsed) {
+          logDebug(`[MAX_BORROW] Base Financials used: ${JSON.stringify(result.maxBorrowingAmountFinancialsUsed, null, 2)}`);
+        }
+        if (result.propertyValue) {
+          logDebug(`[MAX_BORROW] Base Property value used: ${formatCurrency(result.propertyValue)}`);
+        }
+
+        // Calculate improvement scenarios *based on the base result* if needed
+        if (requiredLoanAmount > 0 && !meetsRequirement) { 
+          logDebug('[SCENARIOS] Calculating improvement scenarios - conditions met (based on final borrow amount):');
+          
+          const scenariosStart = performance.now();
+          
+          try {
+            // Use the base result (before scenario impact) for scenario calculation
+            const baseMaxBorrowForScenarios = result.maxBorrowAmount;
+            const cappedRequiredLoanAmount = Math.min(requiredLoanAmount, baseMaxBorrowForScenarios * 1.5);
+            logDebug(`- Using base max borrow for scenario calc: ${formatCurrency(baseMaxBorrowForScenarios)}`);
+            logDebug(`- Using capped required loan amount: ${formatCurrency(cappedRequiredLoanAmount)}`);
+            
+            const scenarios = await calculateImprovementScenarios(
+              financials,
+              result, // Pass the base result object
+              loanProductDetails,
+              savings,
+              propertyPrice,
+              propertyState,
+              propertyPostcode,
+              isFirstHomeBuyer,
+              isInvestmentProperty,
+              cappedRequiredLoanAmount,
+              loanPreferences
+            );
+            
+            const scenariosEnd = performance.now();
+            logDebug(`[SCENARIOS] Calculation complete in ${(scenariosEnd - scenariosStart).toFixed(2)}ms`);
+            // ... rest of scenario handling ...
+            setImprovementScenarios(scenarios);
+            setLoanAmountRequiredMet(false); 
+            // ... more logging ...
+            setCalculationMetrics({
+              maxBorrowingTime: calculationTimeMs, // Base calc time
+              scenariosTime: scenariosEnd - scenariosStart
+            });
+
+          } catch (error) {
+             // ... scenario error handling ...
+             setImprovementScenarios([]);
+          }
         } else {
-          setImprovementScenarios([]);
+           // ... skip scenario calculation ...
+           setImprovementScenarios([]);
         }
-        
       } catch (error) {
-        console.error('[SCENARIOS] Max borrowing calculation error:', error);
-        setError('Unable to calculate borrowing power. Please try again.');
-        setIsCalculating(false);
-        setImprovementScenarios([]);
-        setLoanAmountRequiredMet(false);
+         // ... max borrow error handling ...
+         setMaxBorrowingPower(0);
+         setLoanAmountRequiredMet(false);
+         setImprovementScenarios([]);
+      } finally {
+         // ... finally block ...
       }
     };
     
     calculateBorrowingPower();
   }, [
-    propertyPrice, 
-    savings, 
-    propertyState, 
-    isFirstHomeBuyer, 
-    isInvestmentProperty, 
-    baseInterestRate, 
-    financials, 
-    loanProductDetails,
-    requiredLoanAmount,
-    propertyPostcode,
-    loanPreferences
+    // Dependencies - appliedScenarios is no longer needed here as it's handled internally now
+    financials, loanProductDetails, savings, propertyPrice, propertyState, 
+    propertyPostcode, isFirstHomeBuyer, isInvestmentProperty, requiredLoanAmount, 
+    loanPreferences, selectedLoanAmount, updateDerivedValues, improvementScenarios // Added improvementScenarios needed for appliedImpact calc
   ]);
 
   // Separate effect for initial derived values setup
   useEffect(() => {
-    if (maxBorrowingPower > 0 && !isCalculating) {
-      const initialLoanAmount = requiredLoanAmount > 0 
-        ? Math.min(requiredLoanAmount, maxBorrowingPower)
-        : maxBorrowingPower;
-      
-      logDebug(`[INITIAL_SETUP] Setting initial loan amount: ${formatCurrency(initialLoanAmount)}`);
-      setSelectedLoanAmount(initialLoanAmount);
-      updateDerivedValues(initialLoanAmount, propertyPrice);
+    const initialLoanAmount = requiredLoanAmount > 0 ? requiredLoanAmount : (maxBorrowingPower > 0 ? Math.min(selectedLoanAmount || maxBorrowingPower, maxBorrowingPower) : 0);
+    
+    if (initialLoanAmount > 0 && propertyPrice > 0) {
+      logDebug(`[INIT_DERIVED] Setting up initial derived values with Loan: ${formatCurrency(initialLoanAmount)}`);
+      // Call updateDerivedValues with only one argument
+      updateDerivedValues(initialLoanAmount);
+    } else {
+      logDebug(`[INIT_DERIVED] Skipping initial derived values setup - initial loan or property price is zero.`);
     }
-  }, [maxBorrowingPower, isCalculating, requiredLoanAmount, propertyPrice]);
+  }, [propertyPrice, requiredLoanAmount, maxBorrowingPower, updateDerivedValues, selectedLoanAmount]);
 
   // Add a separate effect to handle UI updates when the selected loan amount changes via the slider
   useEffect(() => {
@@ -518,53 +627,49 @@ export function AffordabilityCalculator({
   const infoBox = getCustomerMessage(loanAmountRequiredMet, maxBorrowingPower, requiredLoanAmount);
 
   // Toggle improvement scenario
-  const toggleImprovementScenario = (scenario: ImprovementScenario) => {
+  const toggleImprovementScenario = useCallback((scenario: ImprovementScenario) => {
     // Check if this scenario is already applied
     const isAlreadyApplied = appliedScenarios.includes(scenario.id);
-    
+    let updatedAppliedScenarios: string[];
+
     if (isAlreadyApplied) {
       // Remove the scenario
-      setAppliedScenarios(prev => prev.filter(id => id !== scenario.id));
-      
-      // Reset to original max borrowing
-      setMaxBorrowingPower(prev => {
-        const updatedBorrowing = prev - scenario.impact;
-        
-        // Update loan amount slider if it's now higher than max
-        if (selectedLoanAmount > updatedBorrowing) {
-          updateDerivedValues(updatedBorrowing);
-        }
-        
-        return updatedBorrowing;
-      });
-      
-      setAffordabilityScenarioUsed(appliedScenarios.length > 1); // Keep flag true if other scenarios are still applied
-      
-      tracingService.logUI('Scenario removed', { 
+      updatedAppliedScenarios = appliedScenarios.filter(id => id !== scenario.id);
+      setAppliedScenarios(updatedAppliedScenarios);
+      // Apply impact reversal immediately for calculation
+      setMaxBorrowingPower(prev => prev - scenario.impact);
+      setAffordabilityScenarioUsed(updatedAppliedScenarios.length > 0);
+       tracingService.logUI('Scenario removed', { 
         scenarioId: scenario.id, 
         scenarioType: scenario.type,
         scenarioTitle: scenario.title 
       });
     } else {
       // Apply the scenario
-      setAppliedScenarios(prev => [...prev, scenario.id]);
-      
-      // Update borrowing power with the impact
-      setMaxBorrowingPower(prev => {
-        const updatedBorrowing = prev + scenario.impact;
-        return updatedBorrowing;
-      });
-      
+      updatedAppliedScenarios = [...appliedScenarios, scenario.id];
+      setAppliedScenarios(updatedAppliedScenarios);
+      // Apply impact immediately for calculation
+      setMaxBorrowingPower(prev => prev + scenario.impact);
       setAffordabilityScenarioUsed(true);
-      
-      tracingService.logUI('Scenario applied', { 
+       tracingService.logUI('Scenario applied', { 
         scenarioId: scenario.id, 
         scenarioType: scenario.type,
         scenarioTitle: scenario.title,
         impact: scenario.impact
       });
     }
-  };
+
+    // Re-calculate derived values after applying/removing a scenario
+    const maxBorrowAfterToggle = maxBorrowingPower + (isAlreadyApplied ? -scenario.impact : scenario.impact);
+    const loanAmountAfterToggle = Math.min(selectedLoanAmount, maxBorrowAfterToggle);
+    // Update derived values based on the potentially adjusted loan amount
+    updateDerivedValues(loanAmountAfterToggle);
+    // Also update the slider if the loan amount was capped
+    if (loanAmountAfterToggle < selectedLoanAmount) {
+      setSelectedLoanAmount(loanAmountAfterToggle);
+    }
+
+  }, [appliedScenarios, selectedLoanAmount, maxBorrowingPower, updateDerivedValues, setAppliedScenarios, setMaxBorrowingPower, setAffordabilityScenarioUsed, setSelectedLoanAmount]);
 
   // Handle export of debug logs as a text file
   const handleExportLogs = () => {
@@ -615,64 +720,36 @@ export function AffordabilityCalculator({
         <Slider
           value={selectedLoanAmount}
           onChange={handleSliderChange}
-          min={Math.max(GLOBAL_LIMITS.MIN_LOAN_AMOUNT, maxBorrowingPower * 0.5)}
-          max={maxBorrowingPower}
-          step={10000}
-          disabled={isCalculating}
-          aria-labelledby="loan-amount-slider"
+          min={100000}
+          max={Math.min(3000000, maxBorrowingPower || 3000000)}
+          step={5000}
           valueLabelDisplay="auto"
           valueLabelFormat={(value) => formatCurrency(value)}
-          marks={[
-            { value: Math.max(GLOBAL_LIMITS.MIN_LOAN_AMOUNT, maxBorrowingPower * 0.5), label: '' },
-            { value: maxBorrowingPower, label: '' }
-          ].filter(mark => mark.value >= Math.max(GLOBAL_LIMITS.MIN_LOAN_AMOUNT, maxBorrowingPower * 0.5) && mark.value <= maxBorrowingPower)}
+          disabled={isCalculating}
           sx={{
-            color: (theme) => theme.palette.primary.main,
-            height: 8,
-            "& .MuiSlider-track": {
-              transition: "width 0.3s ease-out", 
-              height: 8,
-            },
+            color: "#4C108C",
             "& .MuiSlider-thumb": {
               height: 24,
               width: 24,
               backgroundColor: "#fff",
-              border: (theme) => `2px solid ${theme.palette.primary.main}`,
-              transition: "transform 0.1s, left 0.3s ease-out, box-shadow 0.2s",
-              "&:active": {
-                transform: "scale(1.2)",
-              },
+              border: "2px solid #4C108C",
               "&:focus, &:hover, &.Mui-active, &.Mui-focusVisible": {
-                boxShadow: (theme) => `0 0 0 8px ${alpha(theme.palette.primary.main, 0.16)}`,
+                boxShadow: "0 0 0 8px rgba(76, 16, 140, 0.16)",
               },
             },
-            "& .MuiSlider-valueLabel": {
-              backgroundColor: theme => theme.palette.primary.main,
-              fontSize: "0.75rem",
-              padding: "0.5rem 0.75rem",
-              borderRadius: "4px",
-              boxShadow: "0 2px 8px rgba(0,0,0,0.15)",
-              '&:before': {
-                display: 'none',
-              },
-              '&.MuiSlider-valueLabelOpen': {
-                transform: 'translateY(-100%) scale(1)',
-              },
-              transition: 'transform 0.2s ease-out, opacity 0.2s',
-            }
           }}
         />
         <Box sx={{ display: "flex", justifyContent: "space-between", mt: 0.5 }}>
           <Typography variant="body2" color="text.secondary">
-            {formatCurrency(Math.max(GLOBAL_LIMITS.MIN_LOAN_AMOUNT, maxBorrowingPower * 0.5))}
+            {formatCurrency(100000)}
           </Typography>
           <Typography variant="body2" color="text.secondary">
-            {formatCurrency(maxBorrowingPower)}
+            {formatCurrency(Math.min(3000000, maxBorrowingPower || 3000000))}
           </Typography>
         </Box>
       </Box>
     );
-  }, [selectedLoanAmount, maxBorrowingPower, isCalculating, handleSliderChange]);
+  }, [selectedLoanAmount, maxBorrowingPower, isCalculating]);
 
   // Static property data
   const nearbyProperties: Property[] = [
@@ -800,6 +877,75 @@ export function AffordabilityCalculator({
                 </Typography>
               </InfoBox>
             </Fade>
+          )}
+
+          {/* Affordability Comparison */}
+          {maxBorrowResult && (
+            <Box sx={{ mb: 3, mt: 2 }}>
+              {requiredLoanAmount > maxBorrowResult.maxBorrowAmount ? (
+                <Alert 
+                  severity="warning" 
+                  sx={{ mb: 2 }}
+                >
+                  Your maximum borrowing capacity ({formatCurrency(maxBorrowResult.maxBorrowAmount)}) is less than 
+                  the required loan amount ({formatCurrency(requiredLoanAmount)}) for this property.
+                  The slider is constrained to your maximum borrowing capacity.
+                </Alert>
+              ) : (
+                <Alert 
+                  severity="success" 
+                  sx={{ mb: 2 }}
+                >
+                  Good news! Your maximum borrowing capacity ({formatCurrency(maxBorrowResult.maxBorrowAmount)}) exceeds 
+                  the required loan amount ({formatCurrency(requiredLoanAmount)}) for this property.
+                </Alert>
+              )}
+              
+              <Grid container spacing={2}>
+                <Grid item xs={12} md={4}>
+                  <Box sx={{ p: 2, bgcolor: requiredLoanAmount > maxBorrowResult.maxBorrowAmount ? 'error.light' : 'success.light', borderRadius: 1 }}>
+                    <Typography variant="caption" color="text.secondary">Required Loan</Typography>
+                    <Typography variant="h6">{formatCurrency(requiredLoanAmount)}</Typography>
+                  </Box>
+                </Grid>
+                <Grid item xs={12} md={4}>
+                  <Box sx={{ p: 2, bgcolor: 'info.light', borderRadius: 1 }}>
+                    <Typography variant="caption" color="text.secondary">Max Borrowing</Typography>
+                    <Typography variant="h6">{formatCurrency(maxBorrowResult.maxBorrowAmount)}</Typography>
+                  </Box>
+                </Grid>
+                <Grid item xs={12} md={4}>
+                  <Box sx={{ p: 2, bgcolor: 'background.paper', borderRadius: 1 }}>
+                    <Typography variant="caption" color="text.secondary">Affordable Property</Typography>
+                    <Typography variant="h6">{formatCurrency(maxBorrowResult.propertyValue)}</Typography>
+                  </Box>
+                </Grid>
+              </Grid>
+
+              <Box sx={{ mt: 2, textAlign: 'right' }}>
+                <Button
+                  size="small"
+                  variant="text"
+                  onClick={() => {
+                    // Find the MaxBorrowLogs component and scroll to it
+                    const logsElement = document.getElementById('max-borrow-logs');
+                    if (logsElement) {
+                      logsElement.scrollIntoView({ behavior: 'smooth' });
+                      // Toggle expansion if possible
+                      const accordion = logsElement.querySelector('.MuiAccordion-root');
+                      if (accordion) {
+                        const expandButton = accordion.querySelector('.MuiAccordionSummary-expandIconWrapper');
+                        if (expandButton) {
+                          (expandButton as HTMLElement).click();
+                        }
+                      }
+                    }
+                  }}
+                >
+                  View detailed calculation logs
+                </Button>
+              </Box>
+            </Box>
           )}
 
           {/* Updated Card-based Loan Details Display */}

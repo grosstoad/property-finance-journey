@@ -20,7 +20,7 @@ interface RateProduct {
 /**
  * Convert LVR to a tier string (e.g., "0-50", "50-60", etc.)
  */
-function getLvrTier(lvr: number): string {
+export function getLvrTier(lvr: number): string {
   const lvrPercentage = lvr * 100;
   if (lvrPercentage <= 50) return '0-50';
   if (lvrPercentage <= 60) return '50-60';
@@ -39,6 +39,13 @@ export function calculateMonthlyRepayment(
   interestRate: number, 
   loanTerm: number = 30
 ): number {
+  // Handle zero or negative loan amount gracefully (instead of warning)
+  if (loanAmount <= 0) {
+    // Log but don't throw error - this is intentional to avoid fatal crashes
+    console.log('Zero or negative loan amount provided to repayment calculator:', loanAmount);
+    return 0; // Return 0 instead of throwing error
+  }
+  
   // Convert interest rate to monthly decimal rate
   // If interest rate is already in percentage form (e.g. 6.24), divide by 100 first
   const isPercentageForm = interestRate > 1; // Assume >1 means percentage form (e.g. 6.24)
@@ -48,7 +55,13 @@ export function calculateMonthlyRepayment(
   const monthlyRate = annualDecimalRate / 12;
   const termMonths = loanTerm * 12;
   
-  // Log the calculation
+  // Handle zero or negative interest rate gracefully
+  if (monthlyRate <= 0) {
+    console.log('Zero or negative interest rate provided to repayment calculator:', interestRate);
+    return loanAmount / termMonths; // Simple division if rate is invalid (no error)
+  }
+  
+  // Log the calculation details (for debugging)
   console.log('Monthly repayment calculation:', {
     loanAmount,
     providedInterestRate: interestRate,
@@ -56,16 +69,6 @@ export function calculateMonthlyRepayment(
     monthlyRate,
     termMonths
   });
-  
-  if (loanAmount <= 0) {
-    console.warn('Invalid loan amount for repayment calculation:', loanAmount);
-    return 0;
-  }
-  
-  if (monthlyRate <= 0) {
-    console.warn('Invalid interest rate for repayment calculation:', interestRate);
-    return loanAmount / termMonths; // Simple division if rate is invalid
-  }
   
   // Use standard amortization formula for monthly payment
   return loanAmount * 
@@ -85,14 +88,17 @@ export function getProductForLvr(
   fixedTerm: number = 0,
   loanFeatureType: 'redraw' | 'offset' = 'redraw'
 ): LoanProductDetails {
+  // Ensure loan amount is valid
+  const validLoanAmount = loanAmount <= 0 ? 100000 : loanAmount;
+  
   // Ensure lvr is a valid number between 0 and 1
   const validLvr = isNaN(lvr) ? 0.8 : Math.max(0, Math.min(lvr, 0.85));
   
-  console.log('Getting product for LVR:', {
+  console.log('-->> [getProductForLvr] START <<--', {
     providedLvr: lvr,
     normalizedLvr: validLvr,
     lvrPercentage: (validLvr * 100).toFixed(2) + '%',
-    loanAmount,
+    loanAmount: formatCurrency(validLoanAmount),
     isInvestmentProperty,
     isInterestOnly,
     isFixedRate,
@@ -117,7 +123,7 @@ export function getProductForLvr(
     productType = 'Straight Up';
   }
   
-  console.log('Product search criteria:', {
+  console.log('[getProductForLvr] Derived Criteria:', {
     lvrTier,
     loanPurpose,
     repaymentType,
@@ -126,8 +132,12 @@ export function getProductForLvr(
     loanFeatureType: isFixedRate ? 'N/A' : loanFeatureType
   });
   
+  const allProducts = ratesData.ratesData as RateProduct[];
+  console.log(`[getProductForLvr] Total products in ratesData: ${allProducts.length}`);
+  // console.log('[getProductForLvr] First few products:', allProducts.slice(0, 3)); // Optional: Log first few for verification
+  
   // Filter products from rates data - basic criteria
-  let products = (ratesData.ratesData as RateProduct[]).filter(product => 
+  let products = allProducts.filter(product => 
     product['Product Type'] === productType &&
     product['Loan purpose'] === loanPurpose &&
     product['Repayment type'] === repaymentType &&
@@ -135,16 +145,16 @@ export function getProductForLvr(
     product['LVR tier'] === lvrTier
   );
   
-  console.log(`Found ${products.length} matching products before feature type filter`);
+  console.log(`[getProductForLvr] Found ${products.length} products after initial filter:`, products.map(p => p["Product Name"]));
   
-  // For variable rate, filter by loan feature type
-  if (!isFixedRate) {
+  // For variable rate, filter by loan feature type - but only for non-Tailored products
+  if (!isFixedRate && productType !== 'Tailored') {
     products = products.filter(product => {
       const isOffsetProduct = product['Product Name'].includes('Power Up');
       return loanFeatureType === 'offset' ? isOffsetProduct : !isOffsetProduct;
     });
     
-    console.log(`Found ${products.length} matching products after feature type filter`);
+    console.log(`[getProductForLvr] Found ${products.length} products after feature type filter (${loanFeatureType}):`, products.map(p => p["Product Name"]));
   }
   
   // For fixed rate, also match the fixed term
@@ -152,10 +162,10 @@ export function getProductForLvr(
     ? products.filter(p => p['Fixed rate term'] === fixedTerm)
     : products;
   
-  console.log(`Found ${matchingProducts.length} matching products after all filters`);
+  console.log(`[getProductForLvr] Found ${matchingProducts.length} products after fixed term filter (${isFixedRate ? fixedTerm + 'yr' : 'N/A'}):`, matchingProducts.map(p => p["Product Name"]));
   
   if (matchingProducts.length === 0) {
-    console.warn(`No matching product found for: LVR ${lvr}, ${loanPurpose}, ${repaymentType}, ${interestRateType}${isFixedRate ? `, Term ${fixedTerm}yr` : ''}, Feature: ${isFixedRate ? 'N/A' : loanFeatureType}`);
+    console.warn(`[getProductForLvr] No matching product found. Attempting fallback...`);
     
     // Try fallback to Straight Up product for the same LVR tier
     const fallbackProducts = (ratesData.ratesData as RateProduct[]).filter(product => 
@@ -167,17 +177,18 @@ export function getProductForLvr(
     );
     
     if (fallbackProducts.length > 0) {
-      console.log('Using fallback Straight Up product:', fallbackProducts[0]['Product Name']);
-      return createProductFromRateData(fallbackProducts[0], loanAmount);
+      console.log('[getProductForLvr] Using fallback Straight Up product:', fallbackProducts[0]['Product Name']);
+      return createProductFromRateData(fallbackProducts[0], validLoanAmount);
     }
     
     // If still no match, create a default product
-    console.log('No fallback products found, creating default product');
-    return createDefaultProduct(loanAmount, validLvr);
+    console.log('[getProductForLvr] No fallback products found, creating default product');
+    return createDefaultProduct(validLoanAmount, validLvr);
   }
   
-  console.log('Selected product:', matchingProducts[0]['Product Name']);
-  return createProductFromRateData(matchingProducts[0], loanAmount);
+  console.log('[getProductForLvr] Final Selected product:', matchingProducts[0]['Product Name']);
+  console.log('-->> [getProductForLvr] END <<--');
+  return createProductFromRateData(matchingProducts[0], validLoanAmount);
 }
 
 /**
@@ -193,7 +204,8 @@ function createProductFromRateData(rateProduct: RateProduct, loanAmount: number)
     const interestRateDecimal = rateProduct['Interest Rate'];
     const interestRatePercentage = interestRateDecimal * 100;
     
-    console.log('Processing interest rate:', {
+    console.log('[createProductFromRateData] Processing product:', rateProduct['Product Name']);
+    console.log('[createProductFromRateData] Processing interest rate:', {
       rawRate: interestRateDecimal,
       percentageRate: interestRatePercentage
     });
@@ -211,24 +223,47 @@ function createProductFromRateData(rateProduct: RateProduct, loanAmount: number)
     // Get reverting rate information if fixed
     let revertingRate;
     let revertingRepayment;
+    let revertingProductName;
     
     if (rateProduct['Interest Rate Type'] === 'Fixed') {
-      // Find the equivalent variable rate product to revert to
+      // Find the equivalent *Variable P&I* product to revert to in the *same LVR tier*
       const revertingProducts = (ratesData.ratesData as RateProduct[]).filter(product => 
-        product['Loan purpose'] === rateProduct['Loan purpose'] &&
-        product['Repayment type'] === rateProduct['Repayment type'] &&
+        product['Product Type'] !== 'Fixed' && // Must be Variable (Straight Up, Power Up, Tailored)
         product['Interest Rate Type'] === 'Variable' &&
+        product['Loan purpose'] === rateProduct['Loan purpose'] &&
+        product['Repayment type'] === 'Principal & Interest' && // Reverts to P&I
         product['LVR tier'] === rateProduct['LVR tier']
       );
       
       if (revertingProducts.length > 0) {
-        revertingRate = revertingProducts[0]['Interest Rate'] * 100;
+        // Prefer Straight Up or Power Up if available, otherwise take the first match
+        const preferredReverting = revertingProducts.find(p => p['Product Type'].includes('Straight Up') || p['Product Type'].includes('Power Up')) || revertingProducts[0];
+        
+        console.log(`[createProductFromRateData] Fixed rate product ${rateProduct['Product Name']} reverting to: ${preferredReverting['Product Name']}`);
+
+        revertingRate = preferredReverting['Interest Rate'] * 100;
+        // Calculate repayment based on remaining principal & term (approximation)
+        // A more accurate calculation would require amortization schedule
         revertingRepayment = calculateMonthlyRepayment(loanAmount, revertingRate, loanTerm);
+        // Use the reverting product's actual name, keep LVR text for clarity
+        revertingProductName = preferredReverting['Product Name'].replace(/ \\(LVR.*\\)/, '').trim();
+      } else {
+        console.warn(`[createProductFromRateData] Could not find reverting Variable P&I product for LVR tier ${rateProduct['LVR tier']}`);
+        // Fallback if no reverting product found (should ideally not happen)
+        revertingRate = (rateProduct['Interest Rate'] + 0.005) * 100; // Estimate variable as slightly higher
+        revertingRepayment = calculateMonthlyRepayment(loanAmount, revertingRate, loanTerm);
+        revertingProductName = `Variable P&I`; // Simple fallback name
       }
     }
     
+    // Keep the original product name from the JSON, including the LVR tier
+    const originalProductName = rateProduct['Product Name'];
+    // Create a cleaned name for UI display by removing the LVR pattern
+    const cleanedProductName = originalProductName.replace(/ \\(LVR.*\\)/, '').trim();
+
     const product = {
-      productName: rateProduct['Product Name'],
+      productName: cleanedProductName, // Use cleaned name for display
+      originalProductName: originalProductName, // Keep original name if needed later
       interestRate: interestRatePercentage, // Store as percentage value (e.g. 6.24)
       monthlyRepayment,
       loanAmount,
@@ -236,7 +271,7 @@ function createProductFromRateData(rateProduct: RateProduct, loanAmount: number)
       upfrontFeeAmount,
       revertingInterestRate: revertingRate,
       revertingMonthlyRepayment: revertingRepayment,
-      revertingProductName: revertingRate ? 'Variable Rate' : undefined
+      revertingProductName: revertingProductName // Use the found reverting product name
     };
     
     console.log('Created product details:', {

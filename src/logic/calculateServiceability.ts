@@ -3,6 +3,7 @@ import { calculateHEM, getHigherOfDeclaredOrHEM } from './hemService';
 import { convertToAnnual, convertToMonthly } from './frequencyConverter';
 import { DEBT_CALCULATIONS, INCOME_SHADING, LOAN_BUFFERING, LOAN_ASSESSMENT_FACTORS } from '../constants/financialConstants';
 import { calculateTotalTax } from './taxService';
+import { LoanPreferences } from '../types/loan';
 
 /**
  * Calculate deductible interest for investment properties
@@ -60,20 +61,18 @@ function calculateDeductibleInterest(
  * @param financials Financial inputs
  * @param loanAmount Requested loan amount
  * @param interestRate Interest rate (percentage)
- * @param loanTerm Loan term in years
+ * @param loanPreferences User's loan preferences (term, IO period, etc.)
  * @param isInvestmentProperty Whether the property is for investment
  * @param postcode Property postcode (for HEM calculation)
- * @param isPrincipalAndInterest Whether the loan is Principal & Interest or Interest Only
  * @returns Serviceability result including surplus/deficit
  */
 export function calculateServiceability(
   financials: FinancialsInput,
   loanAmount: number,
   interestRate: number,
-  loanTerm: number = 30,
+  loanPreferences: LoanPreferences,
   isInvestmentProperty: boolean = false,
   postcode: string = '2000', // Default to Sydney if not provided
-  isPrincipalAndInterest: boolean = true // Default to P&I
 ): {
   netSurplusOrDeficit: number;
   totalNetIncome: number;
@@ -86,6 +85,13 @@ export function calculateServiceability(
   hemAmount: number;
   declaredExpenses: number;
 } {
+  // Extract relevant preferences
+  const loanTerm = loanPreferences?.loanTerm || 30;
+  const isInterestOnly = (loanPreferences?.interestOnlyTerm || 0) > 0;
+  const interestOnlyTerm = loanPreferences?.interestOnlyTerm || 0;
+
+  console.log('[Serviceability] Calculating with preferences:', { loanTerm, isInterestOnly, interestOnlyTerm });
+
   // Calculate shaded income for applicant 1
   const app1BaseSalary = convertToAnnual(
     financials.applicant1.baseSalaryIncome.value,
@@ -150,17 +156,16 @@ export function calculateServiceability(
   let app2TaxableIncome = app2ShadedGrossIncome;
   
   if (isInvestmentProperty && loanAmount > 0) {
-    // For investment properties, interest is tax deductible
-    // Calculate deductible interest based on loan type
-    const annualInterestRate = interestRate / 100; // Convert percentage to decimal
+    const annualInterestRate = interestRate / 100;
+    // Pass preference info to deductible interest calculation
     deductibleInterest = calculateDeductibleInterest(
       loanAmount, 
       annualInterestRate,
-      isPrincipalAndInterest,
+      !isInterestOnly, // calculateDeductibleInterest expects isPrincipalAndInterest
       loanTerm
     );
     
-    console.log(`Investment property: deductible interest = $${deductibleInterest.toFixed(2)} (${isPrincipalAndInterest ? 'P&I' : 'IO'})`);
+    console.log(`Investment property: deductible interest = $${deductibleInterest.toFixed(2)} (${isInterestOnly ? 'IO' : 'P&I'})`);
     
     // Split the deduction proportionally based on income
     if (shadedGrossIncome > 0) {
@@ -240,9 +245,15 @@ export function calculateServiceability(
   // Handle division by zero when loanAmount is 0
   let monthlyLoanRepayment = 0;
   if (loanAmount > 0) {
-    monthlyLoanRepayment = loanAmount * 
-      (monthlyRate * Math.pow(1 + monthlyRate, termMonths)) / 
-      (Math.pow(1 + monthlyRate, termMonths) - 1);
+    if (isInterestOnly) {
+      // For Interest Only, repayment is just the interest on the buffered rate
+      monthlyLoanRepayment = loanAmount * monthlyRate;
+    } else {
+      // For Principal & Interest, use standard amortization formula
+      monthlyLoanRepayment = loanAmount * 
+        (monthlyRate * Math.pow(1 + monthlyRate, termMonths)) / 
+        (Math.pow(1 + monthlyRate, termMonths) - 1);
+    }
   }
   
   // Calculate total monthly expenses

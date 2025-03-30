@@ -7,7 +7,7 @@
 import { FinancialsInput } from '../../types/FinancialTypes';
 import { calculateServiceability } from '../calculateServiceability';
 import { LvrBand, FinancialConstraintResult, NewLoanDetails } from './types';
-import { LoanProductDetails } from '../../types/loan';
+import { LoanProductDetails, LoanPreferences } from '../../types/loan';
 import { getProductForLvr } from '../productSelector';
 import { depositService } from '../depositService';
 import { getLvrBandFromLvr, getLvrUpperBound, isLvrWithinBand } from './maxBorrowDeposit';
@@ -89,7 +89,7 @@ function calculateDepositComponentsWithTotal(
  * Calculate the maximum loan amount using Present Value formula for a monthly payment
  * 
  * @param monthlyPayment - The monthly payment amount
- * @param interestRate - The annual interest rate as a decimal
+ * @param interestRate - The annual interest rate as a decimal or percentage
  * @param termInYears - The loan term in years
  * @returns The maximum loan amount
  */
@@ -103,7 +103,11 @@ function calculateLoanAmountPV(
   interestRate = safeNumber(interestRate);
   termInYears = safeNumber(termInYears);
   
-  const monthlyRate = interestRate / 12;
+  // Convert percentage to decimal if needed
+  const effectiveRate = interestRate > 1 ? interestRate / 100 : interestRate;
+  
+  // Calculate monthly rate
+  const monthlyRate = effectiveRate / 12;
   const numberOfPayments = termInYears * 12;
   
   // PV formula: PMT * ((1 - (1 + r)^-n) / r)
@@ -121,7 +125,7 @@ export function calculateMaxBorrowingByFinancials(
   loanProductDetails: LoanProductDetails,
   isInvestmentProperty: boolean,
   propertyPostcode: string,
-  loanPreferences: any,
+  loanPreferences: LoanPreferences,
   propertyState: string,
   isFirstHomeBuyer: boolean,
   savings: number,
@@ -135,12 +139,13 @@ export function calculateMaxBorrowingByFinancials(
   maxIterations = safeNumber(maxIterations, 20);
   
   // Create safe loan preferences with defaults
-  const safePreferences = {
+  const safePreferences: LoanPreferences = {
     interestOnlyTerm: loanPreferences?.interestOnlyTerm || 0,
     interestRateType: loanPreferences?.interestRateType || 'VARIABLE',
     fixedTerm: loanPreferences?.fixedTerm || 0,
     loanFeatureType: loanPreferences?.loanFeatureType || 'redraw',
-    loanTerm: loanPreferences?.loanTerm || 30
+    loanTerm: loanPreferences?.loanTerm || 30,
+    repaymentType: loanPreferences?.repaymentType || 'PRINCIPAL_AND_INTEREST'
   };
   
   // Extract LVR upper bound from band
@@ -168,10 +173,9 @@ export function calculateMaxBorrowingByFinancials(
     financials,
     0, // Zero loan amount to get baseline surplus
     product.interestRate,
-    safePreferences.loanTerm,
+    safePreferences,
     isInvestmentProperty,
-    propertyPostcode,
-    safePreferences.interestOnlyTerm > 0
+    propertyPostcode
   );
   
   const availableSurplus = safeNumber(initialServiceability.netSurplusOrDeficit);
@@ -182,7 +186,7 @@ export function calculateMaxBorrowingByFinancials(
     return calculateMaxLoanForOwnerOccupied(
       financials,
       product,
-      loanPreferences,
+      safePreferences,
       propertyPostcode,
       propertyState,
       isFirstHomeBuyer,
@@ -196,7 +200,7 @@ export function calculateMaxBorrowingByFinancials(
     return calculateMaxLoanForInvestor(
       financials,
       product,
-      loanPreferences,
+      safePreferences,
       propertyPostcode,
       propertyState,
       isFirstHomeBuyer,
@@ -215,7 +219,7 @@ export function calculateMaxBorrowingByFinancials(
 function calculateMaxLoanForOwnerOccupied(
   financials: FinancialsInput,
   product: LoanProductDetails,
-  loanPreferences: any,
+  loanPreferences: LoanPreferences,
   propertyPostcode: string,
   propertyState: string,
   isFirstHomeBuyer: boolean,
@@ -233,35 +237,37 @@ function calculateMaxLoanForOwnerOccupied(
   // Convert annual surplus to monthly
   const monthlyPayment = safeNumber(availableSurplus / 12);
   
-  // Apply buffer to interest rate
-  const effectiveRate = safeNumber((product.interestRate / 100) + BUFFER_RATE);
+  // Apply buffer to interest rate - using percentage value from product
+  const effectiveRate = safeNumber(product.interestRate + (BUFFER_RATE * 100)); // product.interestRate is already percentage
   
-  // Calculate effective P&I term
+  // Calculate effective P&I term based on preferences
   const effectivePITerm = safeNumber(loanPreferences.loanTerm - (loanPreferences.interestOnlyTerm || 0));
   
   logger.debug(`PV Calculation Parameters:`);
   logger.debug(`- Monthly payment: $${monthlyPayment.toFixed(2)}`);
-  logger.debug(`- Effective rate: ${(effectiveRate * 100).toFixed(2)}%`);
+  logger.debug(`- Product interest rate: ${(product.interestRate).toFixed(2)}%`);
+  logger.debug(`- Buffer rate: ${(BUFFER_RATE * 100).toFixed(2)}%`);
+  logger.debug(`- Effective rate with buffer: ${effectiveRate.toFixed(2)}%`);
   logger.debug(`- P&I term: ${effectivePITerm} years`);
   
   // Calculate max loan amount using PV formula
+  // Use effectivePITerm which respects the Interest Only period from preferences
   const maxLoanAmount = calculateLoanAmountPV(
     monthlyPayment,
-    effectiveRate,
+    effectiveRate, // Pass rate as percentage
     effectivePITerm
   );
   
   logger.debug(`Direct PV calculation result: $${formatCurrency(maxLoanAmount)}`);
   
-  // Verify with serviceability check
+  // Verify with serviceability check using the preferences
   const validationResult = calculateServiceability(
     financials,
     maxLoanAmount,
     product.interestRate,
-    loanPreferences.loanTerm || 30,
+    loanPreferences, // Pass the full preferences object
     isInvestmentProperty,
-    propertyPostcode,
-    loanPreferences.interestOnlyTerm > 0
+    propertyPostcode
   );
   
   const validationSurplus = safeNumber(validationResult.netSurplusOrDeficit);
@@ -326,7 +332,7 @@ function calculateMaxLoanForOwnerOccupied(
 function calculateMaxLoanForInvestor(
   financials: FinancialsInput,
   product: LoanProductDetails,
-  loanPreferences: any,
+  loanPreferences: LoanPreferences,
   propertyPostcode: string,
   propertyState: string,
   isFirstHomeBuyer: boolean,
@@ -339,49 +345,40 @@ function calculateMaxLoanForInvestor(
   const logger = LoggerFactory.getLogger('MaxBorrowFinancials:INV');
   
   // Start with initial estimate from PV formula
-  // Convert annual surplus to monthly
   const monthlyPayment = initialSurplus / 12;
-  
-  // Apply buffer to interest rate
-  const effectiveRate = (product.interestRate / 100) + BUFFER_RATE;
-  
-  // Calculate effective P&I term
+  const effectiveRate = safeNumber(product.interestRate + (BUFFER_RATE * 100)); // product.interestRate is already percentage
+  // Use effective P&I term based on preferences
   const effectivePITerm = loanPreferences.loanTerm - (loanPreferences.interestOnlyTerm || 0);
   
   logger.debug(`Initial PV Calculation Parameters:`);
   logger.debug(`- Monthly payment: $${monthlyPayment.toFixed(2)}`);
-  logger.debug(`- Effective rate: ${(effectiveRate * 100).toFixed(2)}%`);
+  logger.debug(`- Effective rate: ${effectiveRate.toFixed(2)}%`);
   logger.debug(`- P&I term: ${effectivePITerm} years`);
   
-  // Calculate initial loan amount using PV formula
   let currentLoanAmount = calculateLoanAmountPV(
     monthlyPayment,
-    effectiveRate,
-    effectivePITerm
+    effectiveRate, // Pass rate as percentage
+    effectivePITerm // Use term from preferences
   );
   
   logger.debug(`Initial PV calculation result: $${formatCurrency(currentLoanAmount)}`);
   
   // Iterative approach for investor loans
   let iteration = 0;
-  let previousSurplus = initialSurplus;
   let currentSurplus = 0;
   let converged = false;
-  
-  // Binary search approach
   let lowerBound = 0;
   let upperBound = currentLoanAmount * 2; // Start with a generous upper bound
   
   while (iteration < maxIterations && !converged) {
-    // Calculate serviceability with current loan amount
+    // Calculate serviceability with current loan amount and *correct preferences*
     const serviceabilityResult = calculateServiceability(
       financials,
       currentLoanAmount,
       product.interestRate,
-      loanPreferences.loanTerm || 30,
+      loanPreferences, // Pass the full preferences object
       isInvestmentProperty,
-      propertyPostcode,
-      loanPreferences.interestOnlyTerm > 0
+      propertyPostcode
     );
     
     currentSurplus = serviceabilityResult.netSurplusOrDeficit;
@@ -395,27 +392,21 @@ function calculateMaxLoanForInvestor(
       converged = true;
       logger.debug(`Converged at iteration ${iteration + 1} with surplus $${formatCurrency(currentSurplus)}`);
     } else {
-      // Binary search approach
+      // Binary search adjustment
       if (currentSurplus > 0) {
-        // We can borrow more
         lowerBound = currentLoanAmount;
-        currentLoanAmount = Math.min(upperBound, currentLoanAmount * 1.1); // Increase by up to 10%
+        currentLoanAmount = Math.min(upperBound, currentLoanAmount * 1.1); 
         if (currentLoanAmount === upperBound) {
-          // We're at upper bound, take midpoint
           currentLoanAmount = (lowerBound + upperBound) / 2;
         }
       } else {
-        // We need to borrow less
         upperBound = currentLoanAmount;
         currentLoanAmount = (lowerBound + currentLoanAmount) / 2;
       }
-      
       logger.debug(`- New loan amount: $${formatCurrency(currentLoanAmount)}`);
       logger.debug(`- New bounds: [$${formatCurrency(lowerBound)}, $${formatCurrency(upperBound)}]`);
     }
-    
     iteration++;
-    previousSurplus = currentSurplus;
   }
   
   // Final value
@@ -488,12 +479,8 @@ function calculatePropertyValueFromLoanAmount(
   const logger = LoggerFactory.getLogger('PropertyValueCalculator');
   
   // Define initial bounds for property value
-  // Upper bound: loan amount + savings (assuming no costs)
   const upperBoundPropertyValue = loanAmount + savings;
-  // Lower bound: 90% of upper bound (reasonable starting point)
   const lowerBoundPropertyValue = (loanAmount + savings) * 0.90;
-  
-  // Start with average as initial guess
   let propertyValue = (upperBoundPropertyValue + lowerBoundPropertyValue) / 2;
   
   logger.debug(`Initial property value bounds calculation:`);
@@ -508,21 +495,14 @@ function calculatePropertyValueFromLoanAmount(
   let found = false;
   
   while (iteration < maxIterations && !found) {
-    // Calculate stamp duty and costs for this property value
     const depositComponents = calculateDepositComponentsWithTotal(
       propertyValue,
       propertyState,
       isFirstHomeBuyer,
       isInvestmentProperty
     );
-    
-    // Calculate available deposit from savings after costs
     const availableDeposit = savings - depositComponents.total;
-    
-    // Calculate required deposit for this property value
     const requiredDeposit = propertyValue - loanAmount;
-    
-    // Calculate difference between available and required deposit
     const depositDifference = availableDeposit - requiredDeposit;
     
     logger.debug(`Iteration ${iteration + 1}: Property $${formatCurrency(propertyValue)}, ` +
@@ -532,20 +512,16 @@ function calculatePropertyValueFromLoanAmount(
       `Available $${formatCurrency(availableDeposit)}, ` +
       `Difference $${formatCurrency(depositDifference)}`);
     
-    // Check if we've found the solution (within $10 tolerance)
     if (Math.abs(depositDifference) < 10) {
       found = true;
       logger.debug(`Convergence achieved at iteration ${iteration + 1}`);
     } else if (depositDifference > 0) {
-      // We have more deposit than needed, increase property value
       lowerBound = propertyValue;
       propertyValue = (upperBound + propertyValue) / 2;
     } else {
-      // We don't have enough deposit, decrease property value
       upperBound = propertyValue;
       propertyValue = (lowerBound + propertyValue) / 2;
     }
-    
     iteration++;
   }
   
@@ -566,7 +542,7 @@ export function calculateMaxBorrowingFinancials(
   loanProductDetails: LoanProductDetails,
   isInvestmentProperty: boolean,
   propertyPostcode: string,
-  loanPreferences: any,
+  loanPreferences: LoanPreferences,
   propertyState: string,
   isFirstHomeBuyer: boolean,
   savings: number,
@@ -578,13 +554,14 @@ export function calculateMaxBorrowingFinancials(
   const lvrBands: LvrBand[] = ['0-50', '50-60', '60-70', '70-80', '80-85'];
   const results: Record<LvrBand, FinancialConstraintResult> = {} as Record<LvrBand, FinancialConstraintResult>;
 
-  // Create safe loan preferences with defaults
-  const safePreferences = {
+  // Create safe loan preferences with defaults - use the passed preferences
+  const safePreferences: LoanPreferences = {
     interestOnlyTerm: loanPreferences?.interestOnlyTerm || 0,
     interestRateType: loanPreferences?.interestRateType || 'VARIABLE',
     fixedTerm: loanPreferences?.fixedTerm || 0,
     loanFeatureType: loanPreferences?.loanFeatureType || 'redraw',
-    loanTerm: loanPreferences?.loanTerm || 30
+    loanTerm: loanPreferences?.loanTerm || 30,
+    repaymentType: loanPreferences?.repaymentType || 'PRINCIPAL_AND_INTEREST'
   };
 
   // Calculate for each LVR band
@@ -595,54 +572,35 @@ export function calculateMaxBorrowingFinancials(
     const lvrUpperBound = getLvrUpperBound(lvrBand);
     const isTailoredProduct = loanProductDetails.productName.toLowerCase().includes('tailored');
     
-    // Get the appropriate product for this LVR band
-    let effectiveProduct;
-    
-    if (lvrBand === '80-85' && !isTailoredProduct && loanAmountRequiredScenario !== 'TAILORED') {
-      // For 80-85% band with non-Tailored product, use Tailored product parameters
-      logger.debug('Using Tailored product for 80-85% band');
-      effectiveProduct = getProductForLvr(
-        lvrUpperBound,
-        0, // initial loan amount
-        isInvestmentProperty,
-        safePreferences.interestOnlyTerm > 0,
-        false, // Force variable rate for Tailored
-        0, // No fixed term for Tailored
-        'offset' // Tailored products always have offset
-      );
-    } else if (lvrBand !== '80-85' && isTailoredProduct && loanAmountRequiredScenario === 'TAILORED') {
-      // For lower bands with Tailored product, use Straight Up product parameters
-      logger.debug('Using Straight Up product for lower band');
-      effectiveProduct = getProductForLvr(
-        lvrUpperBound,
-        0, // initial loan amount
-        isInvestmentProperty,
-        safePreferences.interestOnlyTerm > 0,
-        safePreferences.interestRateType === 'FIXED',
-        safePreferences.fixedTerm,
-        'redraw' // Straight Up products use redraw
-      );
-    } else {
-      // Standard product selection
-      effectiveProduct = getProductForLvr(
-        lvrUpperBound,
-        0, // initial loan amount
-        isInvestmentProperty,
-        safePreferences.interestOnlyTerm > 0,
-        safePreferences.interestRateType === 'FIXED',
-        safePreferences.fixedTerm,
-        safePreferences.loanFeatureType
-      );
+    // Determine the effective feature type to search for based on LVR/product
+    let effectiveFeatureType = safePreferences.loanFeatureType;
+    if (lvrBand === '80-85') {
+      // Tailored product doesn't have feature variants in the same way
+      // Use a placeholder or a default if needed, or adjust getProductForLvr
+      effectiveFeatureType = 'offset'; // Assume Tailored implies offset-like functionality for simplicity
     }
+
+    // Get the appropriate product for this LVR band using the safePreferences
+    const effectiveProduct = getProductForLvr(
+      lvrUpperBound,
+      0, // initial loan amount - 0 is fine here as rate doesn't depend on it
+      isInvestmentProperty,
+      safePreferences.interestOnlyTerm > 0,
+      safePreferences.interestRateType === 'FIXED',
+      safePreferences.fixedTerm,
+      effectiveFeatureType
+    );
     
     logger.debug(`Selected product for ${lvrBand}: ${effectiveProduct.productName} with rate ${effectiveProduct.interestRate}%`);
     
+    // Calculate max borrowing for this band using the *safePreferences* 
+    // which now accurately reflect the user's choice or defaults
     results[lvrBand] = calculateMaxBorrowingByFinancials(
       financials,
       effectiveProduct, // Use the LVR-specific product
       isInvestmentProperty,
       propertyPostcode,
-      safePreferences, // Pass safe preferences
+      safePreferences, // Pass the fully formed preferences object
       propertyState,
       isFirstHomeBuyer,
       savings,
@@ -657,4 +615,4 @@ export function calculateMaxBorrowingFinancials(
   }
 
   return results;
-} 
+}

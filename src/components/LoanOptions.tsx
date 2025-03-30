@@ -36,15 +36,16 @@ import { LoanProductCard, OwnHomeLoanProductCard } from './LoanProductCard';
 import { ConfigureLoanModal } from './ConfigureLoanModal';
 import { useLoanProducts } from '../hooks';
 import { ATHENA_LOGO_URL, OWNHOME_LOGO_URL } from '../constants/urls';
+import { useFinancials } from '../contexts/FinancialsContext';
+import { calculateMaxBorrowing } from '../logic/maxBorrow/adapter';
+import { MaxBorrowingResult } from '../types/FinancialTypes';
+import { depositService } from '../logic/depositService';
 
 const Container = styled(Box)(({ theme }) => ({
   marginTop: theme.spacing(3),
   marginBottom: theme.spacing(3),
-  maxWidth: 800,
-  marginLeft: 'auto',
-  marginRight: 'auto',
+  width: '100%',
   [theme.breakpoints.down('md')]: {
-    maxWidth: '100%',
     margin: theme.spacing(3, 2)
   }
 }));
@@ -231,7 +232,7 @@ const CostValue = styled(Typography)(({ theme }) => ({
 }));
 
 interface LoanOptionsProps {
-  onCalculateAffordability: () => void;
+  onCalculateAffordability?: () => void;
 }
 
 export const LoanOptions = ({ onCalculateAffordability }: LoanOptionsProps) => {
@@ -258,9 +259,12 @@ export const LoanOptions = ({ onCalculateAffordability }: LoanOptionsProps) => {
     updateSavings
   } = useProperty();
   
+  const { financials } = useFinancials();
+  
   const [propertyPrice, setPropertyPrice] = useState(0);
   const [savings, setSavings] = useState(0);
   const [isConfigureModalOpen, setIsConfigureModalOpen] = useState(false);
+  const [maxBorrowResult, setMaxBorrowResult] = useState<MaxBorrowingResult | null>(null);
   
   // Debounced property price and savings values
   const [debouncedPropertyPrice, setDebouncedPropertyPrice] = useState(propertyPrice);
@@ -340,6 +344,34 @@ export const LoanOptions = ({ onCalculateAffordability }: LoanOptionsProps) => {
       setLoanAmount(amount);
     }
   }, [debouncedPropertyPrice, debouncedSavings, loanPurpose, isFirstHomeBuyer, selectedProperty, setLoanDeposit, setLoanAmount]);
+  
+  // Calculate max borrowing result
+  const calculateAndUpdateAffordability = async () => {
+    if (selectedProperty && loanProductDetails?.athenaProduct && financials) {
+      try {
+        const result = await calculateMaxBorrowing(
+          financials,
+          loanProductDetails.athenaProduct,
+          debouncedPropertyPrice,
+          loanPurpose === 'INVESTMENT',
+          selectedProperty.address.postcode,
+          debouncedSavings,
+          selectedProperty.address.state,
+          isFirstHomeBuyer,
+          loanAmount?.required || 0,
+          !!loanProductDetails.ownHomeProduct,
+          loanPreferences
+        );
+        
+        setMaxBorrowResult(result);
+      } catch (error) {
+        console.error('Error calculating max borrowing:', error);
+        setMaxBorrowResult(null);
+      }
+    } else {
+      setMaxBorrowResult(null);
+    }
+  };
   
   const handlePurposeChange = (_event: React.MouseEvent<HTMLElement>, newPurpose: LoanPurpose | null) => {
     if (newPurpose !== null) {
@@ -533,22 +565,15 @@ export const LoanOptions = ({ onCalculateAffordability }: LoanOptionsProps) => {
               
               {loanProductDetails.ownHomeProduct ? (
                 <OwnHomeLoanProductCard 
-                  athenaProduct={{
-                    ...loanProductDetails.athenaProduct,
-                    brandLogoSrc: ATHENA_LOGO_URL
-                  }}
-                  ownHomeProduct={{
-                    ...loanProductDetails.ownHomeProduct,
-                    brandLogoSrc: OWNHOME_LOGO_URL
-                  }}
+                  athenaProduct={loanProductDetails.athenaProduct}
+                  ownHomeProduct={loanProductDetails.ownHomeProduct}
+                  maxBorrowResult={maxBorrowResult || undefined}
                 />
               ) : (
                 <LoanProductCard 
-                  product={{
-                    ...loanProductDetails.athenaProduct,
-                    brandLogoSrc: ATHENA_LOGO_URL
-                  }}
+                  product={loanProductDetails.athenaProduct}
                   showLoanAmount={false}
+                  maxBorrowResult={maxBorrowResult || undefined}
                 />
               )}
               
@@ -563,18 +588,6 @@ export const LoanOptions = ({ onCalculateAffordability }: LoanOptionsProps) => {
               />
             </LoanProductsContainer>
           )}
-
-          {/* Add Calculate Affordability button */}
-          <Box sx={{ mt: 3, textAlign: 'center' }}>
-            <Button
-              variant="contained"
-              color="primary"
-              onClick={onCalculateAffordability}
-              size="large"
-            >
-              Calculate your affordability
-            </Button>
-          </Box>
         </CardContainer>
       </Container>
     </Box>

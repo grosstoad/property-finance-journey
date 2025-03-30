@@ -65,13 +65,15 @@ interface FinancialsModalProps {
 }
 
 export function FinancialsModal({ open, onClose, onSubmit }: FinancialsModalProps) {
-  const { financials, setFinancials, showFinancialsModal, setShowFinancialsModal } = useContext(FinancialsContext);
+  const { financials, setFinancials } = useContext(FinancialsContext);
   const { setShowAffordability } = useContext(AffordabilityContext);
   
   const [tabValue, setTabValue] = useState(0);
 
   const handleClose = () => {
-    setShowFinancialsModal(false);
+    if (onClose) {
+      onClose();
+    }
   };
 
   const handleTabChange = (_event: React.SyntheticEvent, newValue: number) => {
@@ -79,10 +81,45 @@ export function FinancialsModal({ open, onClose, onSubmit }: FinancialsModalProp
   };
 
   const handleCalculate = () => {
-    setFinancials(financials);
-    setShowFinancialsModal(false);
-    setShowAffordability(true);
-    onSubmit?.();
+    try {
+      console.log("[FINANCIALS_MODAL] Calculating with financials:", financials);
+      
+      // Validate financials before submission
+      if (!financials || !financials.applicantType) {
+        console.error("[FINANCIALS_MODAL] Invalid financials data:", financials);
+        alert("Please complete all required financial information before calculating.");
+        return;
+      }
+      
+      // First, update financials context
+      setFinancials(financials);
+      
+      // Properly sequence modal closing and affordability display
+      // First close the modal
+      setTimeout(() => {
+        // Call the onClose prop instead of directly manipulating context
+        if (onClose) {
+          onClose();
+        }
+        
+        // Then show affordability after ensuring modal is closed
+        setTimeout(() => {
+          console.log("[FINANCIALS_MODAL] Triggering affordability display");
+          setShowAffordability(true);
+          
+          // Finally call onSubmit after affordability is set to true
+          setTimeout(() => {
+            console.log("[FINANCIALS_MODAL] Sequence complete, calling onSubmit");
+            if (onSubmit) {
+              onSubmit();
+            }
+          }, 100);
+        }, 300);
+      }, 300);
+    } catch (error) {
+      console.error("[FINANCIALS_MODAL] Error during calculation:", error);
+      alert("An error occurred while calculating. Please try again.");
+    }
   };
 
   const updateApplicantType = (type: 'individual' | 'joint') => {
@@ -281,7 +318,7 @@ export function FinancialsModal({ open, onClose, onSubmit }: FinancialsModalProp
   return (
     <Dialog
       open={open}
-      onClose={onClose}
+      onClose={handleClose}
       maxWidth="sm"
       fullWidth
       PaperProps={{

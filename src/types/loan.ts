@@ -63,6 +63,8 @@ export interface LoanProductDetails {
   revertingInterestRate?: number;
   revertingMonthlyRepayment?: number;
   revertingProductName?: string;
+  fixedTerm?: number; // in years
+  loanTerm?: number; // in years
 }
 
 export interface OwnHomeProductDetails {

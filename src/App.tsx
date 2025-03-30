@@ -10,6 +10,7 @@ import { HomePage } from "./pages/HomePage";
 import { PropTrackTestPage } from "./pages/PropTrackTestPage";
 import { PropTrackHooksPage } from "./pages/PropTrackHooksPage";
 import { DepositCalculatorPage } from "./pages/DepositCalculatorPage";
+import { YourFinancialsTest } from "./pages/YourFinancialsTest";
 import { NavBar } from "./components/NavBar";
 import { Box } from "@mui/material";
 
@@ -39,6 +40,7 @@ export const App = () => {
               <Route path="/test" element={<PropTrackTestPage />} />
               <Route path="/hooks" element={<PropTrackHooksPage />} />
               <Route path="/calculator" element={<DepositCalculatorPage />} />
+              <Route path="/components-test" element={<YourFinancialsTest />} />
             </Routes>
           </Box>
         </Box>

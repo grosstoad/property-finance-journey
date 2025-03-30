@@ -1,3 +1,5 @@
+import { LoanProductDetails } from './loan'; // Assuming loan.ts is in the same directory or adjust path
+
 export enum PropertyType {
   HOUSE = 'HOUSE',
   UNIT = 'UNIT',
@@ -64,6 +66,7 @@ export interface ImprovementScenario {
   newMaxBorrowing: number;
   id: string;
   isApplied?: boolean;
+  evaluationCriteria?: string;
 }
 
 export type BorrowingConstraint = 'deposit' | 'financials' | 'global' | 'unserviceable';
@@ -176,12 +179,24 @@ export type LvrDepositUsed =
 
 export type LoanScenario = 'SU_PU_FIXED' | 'TAILORED' | 'OWNHOME_COMBINED';
 
-export interface LoanPreferences {
-  loanTerm?: number;
-  interestOnlyTerm?: number;
-  interestRateType?: 'VARIABLE' | 'FIXED';
-  fixedTerm?: number;
-  loanFeatureType?: string;
+// Import and re-export the correct type
+export type { LoanPreferences } from './loan';
+
+// Add interface for affordability suggestions
+export interface AffordabilitySuggestions {
+  longerLoanTerm?: boolean;
+  jointApplication?: boolean;
+  lowerInterestRate?: boolean;
+  increaseSavings?: boolean;
+  reduceExpenses?: boolean;
+}
+
+export interface SuggestionImpacts {
+  longerLoanTerm?: number;
+  jointApplication?: number;
+  lowerInterestRate?: number;
+  increaseSavings?: number;
+  reduceExpenses?: number;
 }
 
 /**
@@ -214,4 +229,11 @@ export interface MaxBorrowingResult {
   maxBorrowingAmountFinancialsUsed: LvrFinancialsUsed;
   maxBorrowingAmountDepositUsed: LvrDepositUsed;
   loanAmountRequiredScenario: LoanScenario;
+  // Update properties for affordability suggestions
+  scenarios?: ImprovementScenario[]; // Store the full scenario objects
+  appliedScenarioIds?: string[]; // Store IDs of applied scenarios
+  // Keep original fields for potential backward compatibility or detailed logging if needed
+  appliedSuggestions_DEPRECATED?: AffordabilitySuggestions; 
+  suggestionImpacts_DEPRECATED?: SuggestionImpacts; 
+  baseBorrowingAmount?: number; // Base amount before applying suggestions
 } 

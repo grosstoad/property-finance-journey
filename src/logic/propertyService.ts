@@ -25,6 +25,7 @@ const mockProperty: Property = {
     carSpaces: 2,
     landSize: 1071, // in square meters
     buildingSize: 311, // in square meters
+    propertyType: 'House',
   },
   listing: {
     isListed: true,

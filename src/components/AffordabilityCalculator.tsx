@@ -250,7 +250,7 @@ export function AffordabilityCalculator({
         tracingService.startTimer('maxBorrowing_total');
         
         logDebug('[SCENARIOS] Starting max borrowing calculation');
-        const result = calculateMaxBorrowing(
+        const result = await calculateMaxBorrowing(
           financials,
           loanProductDetails,
           propertyPrice,
@@ -311,7 +311,7 @@ export function AffordabilityCalculator({
             const cappedRequiredLoanAmount = Math.min(requiredLoanAmount, result.maxBorrowAmount * 1.5);
             logDebug(`- Using capped required loan amount: ${formatCurrency(cappedRequiredLoanAmount)}`);
             
-            const scenarios = calculateImprovementScenarios(
+            const scenarios = await calculateImprovementScenarios(
               financials,
               result,
               loanProductDetails,

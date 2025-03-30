@@ -315,8 +315,23 @@ export const calculateStampDuty = (params: StampDutyParams): StampDutyResult => 
   console.log('Stamp duty calculation starting with params:', params);
   
   // Validate inputs
-  if (propertyPrice < 0) {
-    throw new Error('Property price cannot be negative');
+  if (typeof propertyPrice !== 'number' || isNaN(propertyPrice) || propertyPrice < 0) {
+    console.error(`Invalid property price: ${propertyPrice}, defaulting to 0`);
+    // Return default result instead of throwing
+    return {
+      stampDuty: 0,
+      breakdown: {
+        baseStampDuty: 0,
+        concessionAmount: 0,
+        foreignSurcharge: 0,
+        finalAmount: 0
+      },
+      thresholds: {
+        rate: 0,
+        baseAmount: 0,
+        appliedThreshold: 0
+      }
+    };
   }
   
   // Get state data, defaulting to NSW if invalid state provided
@@ -372,4 +387,41 @@ export const calculateStampDuty = (params: StampDutyParams): StampDutyResult => 
   console.log('Final stamp duty calculation result:', result);
   
   return result;
-}; 
+};
+
+/**
+ * Calculate stamp duty for a property purchase (simplified version)
+ * @param propertyValue The value of the property
+ * @param state The state or territory where the property is located
+ * @param isFirstHomeBuyer Whether the buyer is a first home buyer
+ * @param isInvestmentProperty Whether the property is for investment
+ * @returns The calculated stamp duty
+ */
+export function calculateStampDutySimple(
+  propertyValue: number,
+  state: string,
+  isFirstHomeBuyer: boolean = false,
+  isInvestmentProperty: boolean = false
+): number {
+  // Validate propertyValue - ensure it's a positive number to prevent negative values
+  if (typeof propertyValue !== 'number' || isNaN(propertyValue) || propertyValue < 0) {
+    console.error('Invalid property value:', propertyValue);
+    return 0; // Return 0 stamp duty for invalid inputs instead of throwing
+  }
+  
+  try {
+    // Call the main implementation with a params object
+    const result = calculateStampDuty({
+      state: state as AustralianState,
+      propertyPrice: propertyValue,
+      purpose: isInvestmentProperty ? 'investment' : 'owner-occupied' as PropertyPurpose,
+      firstHomeBuyer: isFirstHomeBuyer,
+      australianResident: true
+    });
+    
+    return result.stampDuty;
+  } catch (error) {
+    console.error('Error calculating stamp duty:', error);
+    return 0; // Return 0 stamp duty on error instead of throwing
+  }
+} 

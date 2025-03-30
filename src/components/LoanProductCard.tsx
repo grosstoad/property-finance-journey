@@ -11,6 +11,8 @@ import {
 import { LoanProductDetails, OwnHomeProductDetails } from '../types/loan';
 import { formatCurrency, formatPercentage } from '../logic/formatters';
 import { ATHENA_LOGO_URL, OWNHOME_LOGO_URL } from '../constants/urls';
+import { MaxBorrowLogs } from './MaxBorrowLogs';
+import { MaxBorrowingResult } from '../types/FinancialTypes';
 
 const ProductCard = styled(Card)(({ theme }) => ({
   marginBottom: theme.spacing(1.5),
@@ -103,11 +105,13 @@ const getProductFeatures = (productName: string): string[] => {
 interface LoanProductCardProps {
   product: LoanProductDetails;
   showLoanAmount?: boolean;
+  maxBorrowResult?: MaxBorrowingResult;
 }
 
 export const LoanProductCard = ({ 
   product, 
-  showLoanAmount = false 
+  showLoanAmount = false,
+  maxBorrowResult
 }: LoanProductCardProps) => {
   const productFeatures = getProductFeatures(product.productName);
   
@@ -250,6 +254,11 @@ export const LoanProductCard = ({
             </Grid>
           )}
         </Grid>
+        
+        {/* Max Borrow Logs */}
+        {maxBorrowResult && (
+          <MaxBorrowLogs maxBorrowResult={maxBorrowResult} />
+        )}
       </StyledCardContent>
     </ProductCard>
   );
@@ -258,11 +267,13 @@ export const LoanProductCard = ({
 interface OwnHomeLoanProductCardProps {
   athenaProduct: LoanProductDetails;
   ownHomeProduct: OwnHomeProductDetails;
+  maxBorrowResult?: MaxBorrowingResult;
 }
 
 export const OwnHomeLoanProductCard = ({
   athenaProduct,
-  ownHomeProduct
+  ownHomeProduct,
+  maxBorrowResult
 }: OwnHomeLoanProductCardProps) => {
   const athenaProductFeatures = getProductFeatures(athenaProduct.productName);
   
@@ -394,6 +405,11 @@ export const OwnHomeLoanProductCard = ({
               </Grid>
             )}
           </Grid>
+          
+          {/* Max Borrow Logs */}
+          {maxBorrowResult && (
+            <MaxBorrowLogs maxBorrowResult={maxBorrowResult} />
+          )}
         </StyledCardContent>
       </ProductCard>
       

@@ -1,4 +1,4 @@
-import { createContext, ReactNode, useState, useContext } from 'react';
+import { createContext, ReactNode, useState, useContext, useMemo } from 'react';
 import { FinancialsInput, FrequencyType } from '../types/FinancialTypes';
 
 // Initial values for financials
@@ -50,15 +50,19 @@ export function FinancialsProvider({ children }: FinancialsProviderProps) {
   const [financials, setFinancials] = useState<FinancialsInput>(initialFinancials);
   const [showFinancialsModal, setShowFinancialsModal] = useState<boolean>(false);
 
+  // Memoize the context value object
+  const value = useMemo(() => ({
+    financials,
+    setFinancials,
+    showFinancialsModal,
+    setShowFinancialsModal,
+  }), [
+    financials, // Dependency: re-memoize only if financials changes
+    showFinancialsModal // Dependency: re-memoize only if showFinancialsModal changes
+  ]);
+
   return (
-    <FinancialsContext.Provider
-      value={{
-        financials,
-        setFinancials,
-        showFinancialsModal,
-        setShowFinancialsModal,
-      }}
-    >
+    <FinancialsContext.Provider value={value}>
       {children}
     </FinancialsContext.Provider>
   );

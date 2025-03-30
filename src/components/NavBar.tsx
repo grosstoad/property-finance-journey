@@ -48,6 +48,7 @@ export const NavBar = () => {
   const navItems: NavItem[] = [
     { label: 'Home', path: '/', icon: <HomeIcon /> },
     { label: 'Deposit Calculator', path: '/calculator', icon: <CalculateIcon /> },
+    { label: 'Component Test', path: '/components-test', icon: <CalculateIcon /> },
   ];
 
   const handleNavigate = (path: string) => {

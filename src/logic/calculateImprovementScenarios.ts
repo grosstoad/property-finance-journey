@@ -8,7 +8,7 @@ import {
   MaxBorrowAmountReason
 } from '../types/FinancialTypes';
 
-import { LoanPreferences, LoanProductDetails } from '../types/loan';
+import { LoanProductDetails, LoanPreferences } from '../types/loan';
 import { calculateMaxBorrowing } from './maxBorrow/adapter';
 import { getHigherOfDeclaredOrHEM } from './hemService';
 import { formatCurrency } from './formatters';
@@ -30,7 +30,7 @@ import { GLOBAL_LIMITS } from '../constants/financialConstants';
  * @param loanPreferences Loan preferences from UI
  * @returns List of improvement scenarios
  */
-export function calculateImprovementScenarios(
+export async function calculateImprovementScenarios(
   financials: FinancialsInput,
   currentMaxBorrowing: MaxBorrowingResult,
   loanProductDetails: LoanProductDetails,
@@ -42,7 +42,7 @@ export function calculateImprovementScenarios(
   isInvestmentProperty: boolean = false,
   loanAmountRequired: number = 0,
   loanPreferences?: LoanPreferences
-): ImprovementScenario[] {
+): Promise<ImprovementScenario[]> {
   // 1. Entry Point Logging
   console.log('[SCENARIOS_DETAIL] Starting scenario calculation with:', {
     maxBorrowAmount: currentMaxBorrowing.maxBorrowAmount,
@@ -95,7 +95,7 @@ export function calculateImprovementScenarios(
 
     case 'financials':
     case 'unserviceable':
-      return calculateFinancialScenarios(
+      return await calculateFinancialScenarios(
         financials,
         currentMaxBorrowing,
         loanProductDetails,
@@ -110,7 +110,7 @@ export function calculateImprovementScenarios(
       );
 
     case 'deposit':
-      return calculateDepositScenarios(
+      return await calculateDepositScenarios(
         financials,
         currentMaxBorrowing,
         loanProductDetails,
@@ -133,7 +133,7 @@ export function calculateImprovementScenarios(
 /**
  * Calculate scenarios for financial/serviceability constraints
  */
-function calculateFinancialScenarios(
+async function calculateFinancialScenarios(
   financials: FinancialsInput,
   currentMaxBorrowing: MaxBorrowingResult,
   loanProductDetails: LoanProductDetails,
@@ -145,7 +145,7 @@ function calculateFinancialScenarios(
   isInvestmentProperty: boolean,
   loanAmountRequired: number,
   loanPreferences?: LoanPreferences
-): ImprovementScenario[] {
+): Promise<ImprovementScenario[]> {
   const scenarios: ImprovementScenario[] = [];
   const startTime = performance.now();
   
@@ -196,7 +196,7 @@ function calculateFinancialScenarios(
     const reducedExpenses = hemAmount / getFrequencyMultiplier(expensesFrequency);
     modifiedFinancials.liabilities.expenses.value = reducedExpenses;
     
-    const newMaxBorrowing = calculateMaxBorrowing(
+    const newMaxBorrowing = await calculateMaxBorrowing(
       modifiedFinancials,
       loanProductDetails,
       propertyValue,
@@ -207,7 +207,8 @@ function calculateFinancialScenarios(
       isFirstHomeBuyer,
       loanAmountRequired,
       false,
-      loanPreferences
+      loanPreferences,
+      false
     );
     
     // 4. Individual Scenario Calculation Results
@@ -230,7 +231,8 @@ function calculateFinancialScenarios(
         type: 'EXPENSES',
         potentialIncrease: reducedExpenses,
         impact,
-        newMaxBorrowing: newMaxBorrowing.maxBorrowAmount
+        newMaxBorrowing: newMaxBorrowing.maxBorrowAmount,
+        evaluationCriteria: `Expenses > HEM (${formatCurrency(annualizedDeclaredExpenses)} > ${formatCurrency(hemAmount)})`
       });
     }
   }
@@ -244,7 +246,7 @@ function calculateFinancialScenarios(
     const modifiedFinancials = JSON.parse(JSON.stringify(financials));
     modifiedFinancials.liabilities.creditCardLimit = 0;
     
-    const newMaxBorrowing = calculateMaxBorrowing(
+    const newMaxBorrowing = await calculateMaxBorrowing(
       modifiedFinancials,
       loanProductDetails,
       propertyValue,
@@ -255,7 +257,8 @@ function calculateFinancialScenarios(
       isFirstHomeBuyer,
       loanAmountRequired,
       false,
-      loanPreferences
+      loanPreferences,
+      false
     );
     
     console.log('[SCENARIOS_DETAIL] Credit card scenario calculation result:', {
@@ -276,7 +279,8 @@ function calculateFinancialScenarios(
         type: 'CREDIT',
         potentialIncrease: creditCardLimit,
         impact,
-        newMaxBorrowing: newMaxBorrowing.maxBorrowAmount
+        newMaxBorrowing: newMaxBorrowing.maxBorrowAmount,
+        evaluationCriteria: `Credit card limit > $0 (${formatCurrency(creditCardLimit)})`
       });
     }
   }
@@ -294,7 +298,7 @@ function calculateFinancialScenarios(
         newTotalSavings: savings + additionalAmount
       });
       
-      const newMaxBorrowing = calculateMaxBorrowing(
+      const newMaxBorrowing = await calculateMaxBorrowing(
         financials,
         loanProductDetails,
         propertyValue,
@@ -305,7 +309,8 @@ function calculateFinancialScenarios(
         isFirstHomeBuyer,
         loanAmountRequired,
         false,
-        loanPreferences
+        loanPreferences,
+        false
       );
       
       console.log('[SCENARIOS_DETAIL] Savings scenario calculation result:', {
@@ -328,7 +333,8 @@ function calculateFinancialScenarios(
           type: 'SAVINGS',
           potentialIncrease: additionalAmount,
           impact,
-          newMaxBorrowing: newMaxBorrowing.maxBorrowAmount
+          newMaxBorrowing: newMaxBorrowing.maxBorrowAmount,
+          evaluationCriteria: `Current LVR > 50%`
         });
       }
     }
@@ -348,7 +354,7 @@ function calculateFinancialScenarios(
 /**
  * Calculate scenarios for deposit constraints
  */
-function calculateDepositScenarios(
+async function calculateDepositScenarios(
   financials: FinancialsInput,
   currentMaxBorrowing: MaxBorrowingResult,
   loanProductDetails: LoanProductDetails,
@@ -360,7 +366,7 @@ function calculateDepositScenarios(
   isInvestmentProperty: boolean,
   loanAmountRequired: number,
   loanPreferences?: LoanPreferences
-): ImprovementScenario[] {
+): Promise<ImprovementScenario[]> {
   const scenarios: ImprovementScenario[] = [];
   const startTime = performance.now();
   
@@ -373,7 +379,7 @@ function calculateDepositScenarios(
       newTotalSavings: savings + additionalAmount
     });
     
-    const newMaxBorrowing = calculateMaxBorrowing(
+    const newMaxBorrowing = await calculateMaxBorrowing(
       financials,
       loanProductDetails,
       propertyValue,
@@ -384,7 +390,8 @@ function calculateDepositScenarios(
       isFirstHomeBuyer,
       loanAmountRequired,
       false,
-      loanPreferences
+      loanPreferences,
+      false
     );
     
     console.log('[SCENARIOS_DETAIL] Deposit scenario calculation result:', {
@@ -403,11 +410,12 @@ function calculateDepositScenarios(
       scenarios.push({
         id: uuidv4(),
         title: `Increase savings by ${formatCurrency(additionalAmount)}`,
-        description: `Increasing your savings to ${formatCurrency(newTotal)} would provide the deposit needed to increase your borrowing power by ${formatCurrency(impact)}`,
+        description: `Increasing your savings to ${formatCurrency(newTotal)} could break your deposit constraint and increase your borrowing power by ${formatCurrency(impact)}`,
         type: 'SAVINGS',
         potentialIncrease: additionalAmount,
         impact,
-        newMaxBorrowing: newMaxBorrowing.maxBorrowAmount
+        newMaxBorrowing: newMaxBorrowing.maxBorrowAmount,
+        evaluationCriteria: `Limited by deposit constraint`
       });
     }
   }
@@ -415,8 +423,6 @@ function calculateDepositScenarios(
   // Log completion
   console.log('[SCENARIOS_DETAIL] Completed deposit scenario generation:', {
     totalScenariosGenerated: scenarios.length,
-    scenarioTypes: scenarios.map(s => s.type),
-    totalPotentialIncrease: scenarios.reduce((sum, s) => sum + s.impact, 0),
     executionTimeMs: performance.now() - startTime
   });
   

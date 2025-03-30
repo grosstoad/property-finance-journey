@@ -1,4 +1,4 @@
-import { createContext, ReactNode, useContext, useState } from 'react';
+import { createContext, ReactNode, useContext, useState, useCallback, useMemo } from 'react';
 import { LoanDeposit, LoanAmount, LoanDetails, LoanPurpose, LoanPreferences, LoanProductDetails, OwnHomeProductDetails } from '../types/loan';
 
 interface LoanContextType {
@@ -49,7 +49,7 @@ export const LoanProvider = ({ children }: LoanProviderProps) => {
     athenaProduct: null
   });
 
-  const value = {
+  const value = useMemo(() => ({
     loanDeposit,
     setLoanDeposit,
     loanAmount,
@@ -64,7 +64,22 @@ export const LoanProvider = ({ children }: LoanProviderProps) => {
     setLoanPreferences,
     loanProductDetails,
     setLoanProductDetails
-  };
+  }), [
+    loanDeposit,
+    loanAmount,
+    loanDetails,
+    loanPurpose,
+    isFirstHomeBuyer,
+    loanPreferences,
+    loanProductDetails,
+    setLoanDeposit,
+    setLoanAmount,
+    setLoanDetails,
+    setLoanPurpose,
+    setIsFirstHomeBuyer,
+    setLoanPreferences,
+    setLoanProductDetails
+  ]);
 
   return (
     <LoanContext.Provider value={value}>

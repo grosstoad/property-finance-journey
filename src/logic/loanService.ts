@@ -1,7 +1,7 @@
 import { LoanDeposit, LoanAmount, LoanDetails, LoanPurpose } from '../types/loan';
 import { DEFAULT_UPFRONT_COSTS, DEFAULT_MAX_LVR } from '../constants/defaultValues';
 import { calculateStampDuty } from './stampDutyCalculator';
-import { calculateDepositDetails, calculateLoanAmountRequired } from './depositService';
+import { calculateDepositDetails, calculateLoanAmountRequired, depositService } from './depositService';
 import { PropertyPurpose } from '../types/stampDuty';
 
 /**
@@ -30,7 +30,8 @@ export const calculateLoanDeposit = (
   });
   
   const stampDuty = stampDutyResult.stampDuty;
-  const upfrontCosts = DEFAULT_UPFRONT_COSTS;
+  // Use depositService to calculate upfront costs dynamically
+  const upfrontCosts = depositService.calculateUpfrontCosts(propertyPrice);
   const availableForDeposit = Math.max(0, savings - stampDuty - upfrontCosts);
   
   return {

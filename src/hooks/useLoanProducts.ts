@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useLoan } from '../contexts/LoanContext';
 import { useProperty } from '../contexts/PropertyContext';
 import { getLoanProductDetails } from '../logic/loanProductService';
@@ -8,6 +8,7 @@ export const useLoanProducts = () => {
   const { 
     loanAmount, 
     loanPurpose, 
+    isFirstHomeBuyer, 
     loanPreferences, 
     setLoanPreferences,
     loanProductDetails,
@@ -50,15 +51,15 @@ export const useLoanProducts = () => {
   ]);
   
   // Handle updating loan preferences
-  const updateLoanPreferences = (newPreferences: Partial<LoanPreferences>) => {
+  const updateLoanPreferences = useCallback((newPreferences: Partial<LoanPreferences>) => {
     setLoanPreferences({
       ...loanPreferences,
       ...newPreferences
     });
-  };
+  }, [setLoanPreferences]);
   
   // Get default loan preferences based on LVR
-  const getDefaultPreferencesForLvr = (lvr: number): LoanPreferences => {
+  const getDefaultPreferencesForLvr = useCallback((lvr: number): LoanPreferences => {
     if (lvr > 0.85) {
       // For high LVR, default to Power Up with 30 year term
       return {
@@ -83,10 +84,10 @@ export const useLoanProducts = () => {
         loanTerm: 30
       };
     }
-  };
+  }, []);
   
   // Reset preferences to defaults for current LVR
-  const resetPreferencesToDefaults = () => {
+  const resetPreferencesToDefaults = useCallback(() => {
     if (!loanAmount || !selectedProperty) {
       return;
     }
@@ -95,12 +96,20 @@ export const useLoanProducts = () => {
     const defaultPreferences = getDefaultPreferencesForLvr(lvr);
     
     setLoanPreferences(defaultPreferences);
-  };
+  }, [loanAmount, selectedProperty, getDefaultPreferencesForLvr, setLoanPreferences]);
   
-  return {
+  // Memoize the return value of the hook
+  const returnValue = useMemo(() => ({
     loanProductDetails,
     loanPreferences,
     updateLoanPreferences,
     resetPreferencesToDefaults
-  };
+  }), [
+    loanProductDetails, // Re-memoize if product details change
+    loanPreferences,    // Re-memoize if preferences change
+    updateLoanPreferences, // Stable callback
+    resetPreferencesToDefaults // Stable callback
+  ]);
+
+  return returnValue;
 }; 

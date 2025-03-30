@@ -18,6 +18,7 @@ export interface PropertyFeatures {
   carSpaces: number;
   landSize: number;
   buildingSize: number;
+  propertyType: string;
 }
 
 export interface PropertyListing {
