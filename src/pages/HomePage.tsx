@@ -72,7 +72,24 @@ export const HomePage = () => {
           </Box>
           
           <Box mb={4}>
-            <PropertyDetails key={`property-details-${selectedProperty.id}`} />
+            {selectedProperty && (
+              <PropertyDetails 
+                key={`property-details-${selectedProperty.id}`}
+                address={selectedProperty.address.street}
+                suburb={`${selectedProperty.address.suburb} ${selectedProperty.address.state} ${selectedProperty.address.postcode}`}
+                propertyType={(selectedProperty.features as any).propertyType || 'House'} // Handle potential missing type
+                bedrooms={selectedProperty.features.bedrooms}
+                bathrooms={selectedProperty.features.bathrooms}
+                carSpaces={selectedProperty.features.carSpaces}
+                landSize={selectedProperty.features.landSize}
+                buildingSize={selectedProperty.features.buildingSize}
+                estimatedValue={selectedProperty.valuation.mid}
+                lowEstimate={selectedProperty.valuation.low}
+                highEstimate={selectedProperty.valuation.high}
+                confidenceLevel={selectedProperty.valuation.confidenceLevel}
+                // imageSrc can be added if available on selectedProperty
+              />
+            )}
           </Box>
           
           <Box mt={2}>

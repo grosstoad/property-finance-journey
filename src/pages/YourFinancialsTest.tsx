@@ -127,7 +127,16 @@ export const YourFinancialsTest = () => {
                   </Grid>
                   
                   {/* Use the PropertyDetails component that pulls from the PropertyContext */}
-                  <PropertyDetails />
+                  {/* <PropertyDetails /> */}
+                  {/* Replaced with mock props version for testing */}
+                  <PropertyDetails 
+                    address="Mock Address 123"
+                    suburb="MOCKVILLE TST 9999"
+                    bedrooms={3}
+                    bathrooms={1}
+                    carSpaces={1}
+                    // Other optional props can be added if needed for the test
+                  />
                   
                   {/* New Section: PropertyCard Component */}
                   <Box>

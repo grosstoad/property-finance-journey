@@ -8,7 +8,7 @@ export const PropertyDetailsTest = () => {
     suburb: 'SUBURBIA NSW 2075',
     bedrooms: 4,
     bathrooms: 2,
-    parking: 2,
+    carSpaces: 2,
     landSize: 1071,
     floorSize: 311,
     estimatedValue: 1960000,
