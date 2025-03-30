@@ -160,7 +160,7 @@ export function calculateMaxBorrowingByFinancials(
     lvrUpperBound, 
     initialLoanAmount, // Use initial loan amount instead of 0
     isInvestmentProperty,
-    safePreferences.interestOnlyTerm > 0,
+    (safePreferences.interestOnlyTerm || 0) > 0,
     safePreferences.interestRateType === 'FIXED',
     safePreferences.fixedTerm,
     safePreferences.loanFeatureType
@@ -585,7 +585,7 @@ export function calculateMaxBorrowingFinancials(
       lvrUpperBound,
       0, // initial loan amount - 0 is fine here as rate doesn't depend on it
       isInvestmentProperty,
-      safePreferences.interestOnlyTerm > 0,
+      (safePreferences.interestOnlyTerm || 0) > 0,
       safePreferences.interestRateType === 'FIXED',
       safePreferences.fixedTerm,
       effectiveFeatureType
