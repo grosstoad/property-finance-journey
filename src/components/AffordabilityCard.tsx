@@ -48,7 +48,7 @@ export const AffordabilityCard = ({ onClick }: AffordabilityCardProps) => {
     <StyledCard onClick={onClick}>
       <Box sx={{ display: 'flex', alignItems: 'center' }}>
         <IconWrapper>
-          <AttachMoneyIcon sx={{ color: '#348433', fontSize: 36 }} />
+          <AttachMoneyIcon sx={{ color: '#fff', fontSize: 36 }} />
         </IconWrapper>
         <Box>
           <Typography variant="h6" component="h2" fontWeight={700}>

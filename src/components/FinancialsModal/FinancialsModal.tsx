@@ -324,7 +324,7 @@ export function FinancialsModal({ open, onClose, onSubmit }: FinancialsModalProp
       PaperProps={{
         sx: {
           maxHeight: '90vh',
-          width: '550px',
+          // width: '550px',
         },
       }}
     >
@@ -351,7 +351,7 @@ export function FinancialsModal({ open, onClose, onSubmit }: FinancialsModalProp
 
           <Box sx={{ mb: 3 }}>
             <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
-              <Box sx={{ width: '48%' }}>
+              <Box sx={{ width: '60%' }}>
                 <Typography variant="subtitle2" gutterBottom>
                   Applicant Type
                 </Typography>
@@ -359,7 +359,7 @@ export function FinancialsModal({ open, onClose, onSubmit }: FinancialsModalProp
                   Select whether this is an individual or joint application
                 </Typography>
               </Box>
-              <Box sx={{ width: '48%' }}>
+              <Box sx={{ width: '40%' }}>
                 <Typography variant="subtitle2" gutterBottom>
                   Number of Dependents
                 </Typography>
@@ -370,7 +370,7 @@ export function FinancialsModal({ open, onClose, onSubmit }: FinancialsModalProp
             </Box>
 
             <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-              <Box sx={{ width: '48%', display: 'flex', gap: 1 }}>
+              <Box sx={{ width: '60%', display: 'flex', gap: 1 }}>
                 <Paper
                   variant="outlined"
                   sx={{
@@ -424,7 +424,7 @@ export function FinancialsModal({ open, onClose, onSubmit }: FinancialsModalProp
                 </Paper>
               </Box>
 
-              <Box sx={{ width: '48%' }}>
+              <Box sx={{ width: '40%' }}>
                 <FormControl fullWidth size="small">
                   <Select 
                     value={financials.numDependents} 
