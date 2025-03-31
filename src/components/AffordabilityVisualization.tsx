@@ -204,15 +204,15 @@ export function AffordabilityVisualization({
                 interestRate={productDetails?.interestRate ?? 0}
                 monthlyRepayment={monthlyRepayment}
                 revertingInterestRate={productDetails?.revertingInterestRate} // Keep optional chaining
-                // revertingYears={productDetails?.initialTerm || 0} 
-                // remainingYears={(loanPreferences.loanTerm || 30) - (productDetails?.initialTerm || 0)} 
+                revertingYears={loanPreferences.interestRateType === 'FIXED' ? loanPreferences.fixedTerm || 0 : (loanPreferences.interestOnlyTerm || 0)}
+                remainingYears={(loanPreferences.loanTerm || 30) - (loanPreferences.interestRateType === 'FIXED' ? loanPreferences.fixedTerm || 0 : (loanPreferences.interestOnlyTerm || 0))}
                 loanProductName={productDetails?.productName ?? "Loan"} // Provide fallback
-                // lvrRange={getLvrRangeText(lvrPercentage)} 
+                lvrRange={`${Math.floor(lvrPercentage/10)*10}-${Math.ceil(lvrPercentage/10)*10}% LVR`}
                 isInterestOnly={isInterestOnlySelected(loanPreferences.interestOnlyTerm)} 
                 isFixed={loanPreferences.interestRateType === 'FIXED'} 
                 hasRevertingRate={!!productDetails?.revertingInterestRate} // Keep optional chaining
                 revertingProductName={productDetails?.revertingProductName}
-                // features={getProductFeatures(productDetails?.productName || "")} 
+                features={getProductFeatures(productDetails?.productName || "")}
                 onEdit={onEditLoanPreferences}
               />
             )}

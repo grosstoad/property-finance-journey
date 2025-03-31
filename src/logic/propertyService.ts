@@ -35,9 +35,9 @@ const mockProperty: Property = {
     listingUrl: 'https://www.realestate.com.au/property/1-straight-street-suburbia-nsw-2075',
   },
   valuation: {
-    low: 2040000, // $2.04m
-    mid: 2357000, // $2.357m
-    high: 2670000, // $2.67m
+    low: 1000000, // $1.0m
+    mid: 1200000, // $1.2m
+    high: 1400000, // $1.4m
     confidenceLevel: 'MEDIUM',
   },
   images: [

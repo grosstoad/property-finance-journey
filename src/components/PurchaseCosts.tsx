@@ -99,7 +99,7 @@ export const PurchaseCosts: React.FC<PurchaseCostsProps> = ({ onCostsChange }) =
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
   
   // Get context hooks
-  const { selectedProperty, updateSavings } = useProperty();
+  const { selectedProperty, updateSavings, depositDetails } = useProperty();
   const { 
     loanPurpose, setLoanPurpose,
     isFirstHomeBuyer, setIsFirstHomeBuyer,
@@ -109,34 +109,52 @@ export const PurchaseCosts: React.FC<PurchaseCostsProps> = ({ onCostsChange }) =
   
   // State
   const [propertyPrice, setPropertyPrice] = useState(() => {
-    return selectedProperty?.valuation?.mid || 1960000;
+    return selectedProperty?.valuation?.mid || 1200000;
   });
   const [savingsToContribute, setSavingsToContribute] = useState(() => {
-    // Default to a percentage of property price or use context value if available
-    return selectedProperty?.valuation?.mid 
-      ? Math.round(selectedProperty.valuation.mid * (DEFAULT_SAVINGS_PERCENTAGE / 100))
-      : 800000;
+    return depositDetails?.savings || 400000;
   });
+  
+  // State flags to track manual input
+  const [propertyPriceManuallySet, setPropertyPriceManuallySet] = useState(false);
+  const [savingsManuallySet, setSavingsManuallySet] = useState(false);
   
   // Debounced values
   const [debouncedPropertyPrice, setDebouncedPropertyPrice] = useState(propertyPrice);
   const [debouncedSavings, setDebouncedSavings] = useState(savingsToContribute);
 
-  // Initialize from selected property when it changes
+  // Initialize/Update from selected property when it changes, respecting manual overrides
   useEffect(() => {
-    if (selectedProperty && selectedProperty.valuation) {
-      const valuation = selectedProperty.valuation.mid;
-      setPropertyPrice(valuation);
-      setDebouncedPropertyPrice(valuation);
-      
-      // Check if we should update savings based on property
-      if (!savingsToContribute) {
-        const defaultSavings = Math.round(valuation * (DEFAULT_SAVINGS_PERCENTAGE / 100));
-        setSavingsToContribute(defaultSavings);
-        setDebouncedSavings(defaultSavings);
+    if (selectedProperty) {
+      if (selectedProperty.valuation) {
+        const valuation = selectedProperty.valuation.mid;
+        // Only update property price if not manually set
+        if (!propertyPriceManuallySet) {
+          setPropertyPrice(valuation);
+          setDebouncedPropertyPrice(valuation);
+        }
+      }
+
+      // Only update savings if not manually set
+      if (!savingsManuallySet) {
+        if (depositDetails?.savings) {
+          // If context has savings, use that
+          setSavingsToContribute(depositDetails.savings);
+          setDebouncedSavings(depositDetails.savings);
+        } else if (selectedProperty.valuation) {
+          // If no context savings but valuation exists, calculate default %
+          const defaultSavings = Math.round(selectedProperty.valuation.mid * (DEFAULT_SAVINGS_PERCENTAGE / 100));
+          setSavingsToContribute(defaultSavings);
+          setDebouncedSavings(defaultSavings);
+        } else {
+          // Fallback if no context savings and no valuation (should we use the hardcoded default?)
+           // Using the state initializer default (400000) implicitly here if neither context nor valuation provides a value.
+        }
       }
     }
-  }, [selectedProperty, savingsToContribute]);
+    // We only want this effect to re-run when the selectedProperty itself changes,
+    // not when the manual flags change. The flags control logic *inside* the effect.
+  }, [selectedProperty]);
   
   // Debounce property price changes
   useEffect(() => {
@@ -149,50 +167,52 @@ export const PurchaseCosts: React.FC<PurchaseCostsProps> = ({ onCostsChange }) =
     };
   }, [propertyPrice]);
   
-  // Debounce savings changes
+  // Debounce savings changes and sync to context
   useEffect(() => {
     const timerId = setTimeout(() => {
       setDebouncedSavings(savingsToContribute);
-      // Update PropertyContext with new savings value
-      updateSavings(savingsToContribute);
-      console.log('Syncing savings value to PropertyContext:', savingsToContribute);
+      // Update PropertyContext only if the value was manually changed
+      if (savingsManuallySet) {
+          updateSavings(savingsToContribute);
+          console.log('Syncing manually set savings value to PropertyContext:', savingsToContribute);
+      }
     }, INPUT_DEBOUNCE_TIME);
     
     return () => {
       clearTimeout(timerId);
     };
-  }, [savingsToContribute, updateSavings]);
+  }, [savingsToContribute, updateSavings, savingsManuallySet]);
   
-  // Calculate loan amount when inputs change
+  // Calculate loan amount when debounced inputs change
   useEffect(() => {
-    if (selectedProperty) {
-      const state = selectedProperty.address.state;
-      const postcode = selectedProperty.address.postcode;
-      
-      // Calculate deposit
-      const deposit = calculateLoanDeposit(
-        debouncedPropertyPrice,
-        debouncedSavings,
-        state,
-        loanPurpose,
-        isFirstHomeBuyer
-      );
-      
-      setLoanDeposit(deposit);
-      
-      // Calculate loan amount
-      const amount = calculateLoanAmount(
-        debouncedPropertyPrice,
-        debouncedSavings,
-        state,
-        loanPurpose,
-        isFirstHomeBuyer,
-        postcode
-      );
-      
-      setLoanAmount(amount);
-    }
-  }, [debouncedPropertyPrice, debouncedSavings, loanPurpose, isFirstHomeBuyer, selectedProperty, setLoanDeposit, setLoanAmount]);
+    // Ensure we have a property context before calculating
+    const state = selectedProperty?.address?.state as AustralianState | undefined ?? 'NSW';
+    const postcode = selectedProperty?.address?.postcode ?? '2000';
+    
+    // Calculate deposit
+    const deposit = calculateLoanDeposit(
+      debouncedPropertyPrice,
+      debouncedSavings,
+      state,
+      loanPurpose,
+      isFirstHomeBuyer
+    );
+    
+    setLoanDeposit(deposit);
+    
+    // Calculate loan amount
+    const amount = calculateLoanAmount(
+      debouncedPropertyPrice,
+      debouncedSavings,
+      state,
+      loanPurpose,
+      isFirstHomeBuyer,
+      postcode
+    );
+    
+    setLoanAmount(amount);
+    // Removed selectedProperty from dependencies as state/postcode are derived and handled
+  }, [debouncedPropertyPrice, debouncedSavings, loanPurpose, isFirstHomeBuyer, setLoanDeposit, setLoanAmount]);
 
   // Convert between our UI representation and context representation
   const propertyType: 'live-in' | 'investment' = loanPurpose === 'OWNER_OCCUPIED' ? 'live-in' : 'investment';
@@ -215,30 +235,36 @@ export const PurchaseCosts: React.FC<PurchaseCostsProps> = ({ onCostsChange }) =
   
   // Calculate costs for display
   const costs = {
-    deposit: loanDeposit?.availableForDeposit || savingsToContribute,
-    stampDuty: loanDeposit?.stampDuty || 
+    deposit: loanDeposit?.availableForDeposit ?? savingsToContribute,
+    stampDuty: loanDeposit?.stampDuty ?? 
       calculateStampDuty({
-        propertyPrice,
-        state: selectedProperty?.address?.state as AustralianState || 'NSW',
+        propertyPrice: debouncedPropertyPrice,
+        state: selectedProperty?.address?.state as AustralianState ?? 'NSW',
         purpose: propertyType === 'live-in' ? 'owner-occupied' : 'investment',
         firstHomeBuyer: isFirstHomeBuyer
       }).stampDuty,
-    otherCosts: loanDeposit?.upfrontCosts || depositService.calculateUpfrontCosts(propertyPrice),
-    loanAmount: loanAmount?.required || (propertyPrice - savingsToContribute),
-    lvr: loanAmount?.lvr || ((propertyPrice - savingsToContribute) / propertyPrice * 100)
+    otherCosts: loanDeposit?.upfrontCosts ?? depositService.calculateUpfrontCosts(debouncedPropertyPrice),
+    loanAmount: loanAmount?.required ?? Math.max(0, debouncedPropertyPrice - savingsToContribute),
+    lvr: loanAmount?.lvr ?? (debouncedPropertyPrice > 0 ? (Math.max(0, debouncedPropertyPrice - savingsToContribute) / debouncedPropertyPrice * 100) : 0)
   };
 
-  // Notify parent component of changes
+  // Notify parent component of changes - Use debounced values for consistency
   useEffect(() => {
     if (onCostsChange) {
+      console.log('[PurchaseCosts] Calling onCostsChange with:', {
+        propertyPrice: debouncedPropertyPrice,
+        savingsToContribute: debouncedSavings,
+        isFirstTimeBuyer: isFirstHomeBuyer,
+        propertyType
+      });
       onCostsChange({
-        propertyPrice,
-        savingsToContribute,
+        propertyPrice: debouncedPropertyPrice,
+        savingsToContribute: debouncedSavings,
         isFirstTimeBuyer: isFirstHomeBuyer,
         propertyType,
       });
     }
-  }, [propertyPrice, savingsToContribute, isFirstHomeBuyer, propertyType, onCostsChange]);
+  }, [debouncedPropertyPrice, debouncedSavings, isFirstHomeBuyer, propertyType, onCostsChange]);
 
   return (
     <StyledCard>
@@ -302,7 +328,10 @@ export const PurchaseCosts: React.FC<PurchaseCostsProps> = ({ onCostsChange }) =
           <Grid item xs={6} sm={5} sx={{ display: 'flex', justifyContent: 'flex-end', pr: 1 }}>
             <CurrencyTextField
               value={propertyPrice}
-              onChange={(e) => setPropertyPrice(Number(e.target.value))}
+              onChange={(e) => {
+                 setPropertyPrice(Number(e.target.value));
+                 setPropertyPriceManuallySet(true);
+               }}
               variant="outlined"
               size="small"
               sx={{
@@ -335,7 +364,10 @@ export const PurchaseCosts: React.FC<PurchaseCostsProps> = ({ onCostsChange }) =
           <Grid item xs={6} sm={5} sx={{ display: 'flex', justifyContent: 'flex-end', pr: 1 }}>
             <CurrencyTextField
               value={savingsToContribute}
-              onChange={(e) => setSavingsToContribute(Number(e.target.value))}
+               onChange={(e) => {
+                 setSavingsToContribute(Number(e.target.value));
+                 setSavingsManuallySet(true);
+               }}
               variant="outlined"
               size="small"
               sx={{

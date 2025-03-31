@@ -249,9 +249,25 @@ export function AffordabilityCard_2({
     }
   };
 
-  // Handle text input blur to format the value
+  // Handle text input blur to format the value and notify parent
   const handleInputBlur = () => {
-    setInputValue(formatCurrency(propertyValue));
+    const numericValue = Number(inputValue.replace(/[^0-9.-]+/g, ''));
+    let finalValue = propertyValue; // Default to current state
+
+    if (!isNaN(numericValue)) {
+      // Ensure the final value is constrained
+      finalValue = Math.min(Math.max(numericValue, minPropertyValue), maxPropertyValue);
+    }
+    
+    // Format the constrained value for display
+    setInputValue(formatCurrency(finalValue));
+    setPropertyValue(finalValue); // Update internal state to match formatted value
+    
+    // Notify parent of the final validated value
+    if (onChange) {
+      console.log(`[InputBlur] Notifying parent of final property value: ${formatCurrency(finalValue)}`);
+      onChange(finalValue);
+    }
   };
 
   // Update input when the initial prop changes (e.g., due to parent recalculation)

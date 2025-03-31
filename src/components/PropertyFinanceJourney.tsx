@@ -23,6 +23,7 @@ import { LoanProductDetails } from '../types/loan';
 import { getProductForLvr, calculateMonthlyRepayment } from '../logic/productSelector';
 import { depositService } from '../logic/depositService';
 import { getLvrTier } from '../logic/productSelector';
+import { calculateLoanAmountRequired } from '../logic/depositService';
 
 // Let's use direct import paths for images, assuming we'll add these files later
 import propertyLogo from '../assets/images/property-logo.svg';
@@ -61,6 +62,7 @@ export const PropertyFinanceJourney: React.FC<PropertyFinanceJourneyProps> = ({ 
   const [appliedScenarios, setAppliedScenarios] = useState<string[]>([]); // State to track applied scenarios
   const [originalFinancials, setOriginalFinancials] = useState<FinancialsInput | null>(null); // State for original financials
   const [originalSavings, setOriginalSavings] = useState<number | null>(null); // Store original savings for revert
+  const [estimatedRequiredLoanAmount, setEstimatedRequiredLoanAmount] = useState<number | null>(null);
   const [visualisationState, setVisualisationState] = useState<VisualisationState | null>(null);
   const [currentSliderPropertyValue, setCurrentSliderPropertyValue] = useState<number | null>(null); // New state for slider value
   const theme = useTheme();
@@ -179,8 +181,10 @@ export const PropertyFinanceJourney: React.FC<PropertyFinanceJourneyProps> = ({ 
     hasCalculatedAffordability, // Added dependency on hasCalculatedAffordability
     financials, // Revert: Remove stringify
     selectedProperty, // Revert: Remove stringify
-    loanPurpose 
-    // REMOVED: loanPreferences, loanProductDetails, depositDetails, loanAmount
+    loanPurpose,
+    loanPreferences, // Add loanPreferences back to dependency array
+    loanProductDetails // Add loanProductDetails back to dependency array
+    // depositDetails and loanAmount still excluded since they're used as fallbacks
   ]);
 
   const calculateBorrowingPower = () => {
@@ -379,6 +383,32 @@ export const PropertyFinanceJourney: React.FC<PropertyFinanceJourneyProps> = ({ 
     updateLoanPreferences(newPreferences); // Update state first
     // NO MORE MANUAL RECALCULATION HERE - rely on the useEffect above reacting to loanPreferences change
   };
+
+  // Callback handler for PurchaseCosts changes
+  const handlePurchaseCostsChange = useCallback(({ propertyPrice, savingsToContribute }: {
+    propertyPrice: number;
+    savingsToContribute: number;
+    isFirstTimeBuyer: boolean;
+    propertyType: 'live-in' | 'investment';
+  }) => {
+    console.log('[PFJ] handlePurchaseCostsChange received:', { propertyPrice, savingsToContribute });
+    // Recalculate the required loan amount based on the *estimated* inputs
+    // We need state and buyer status from context/state here
+    if (selectedProperty?.address?.state && depositDetails) {
+      const costs = depositService.calculateDepositComponents(
+        propertyPrice, // Use estimated price
+        selectedProperty.address.state,
+        isFirstHomeBuyer,
+        loanPurpose === 'INVESTMENT'
+      );
+      const availableDeposit = Math.max(0, savingsToContribute - (costs.stampDuty + costs.legalFees + costs.otherUpfrontCosts));
+      const requiredLoan = calculateLoanAmountRequired({ propertyPrice, availableForDeposit: availableDeposit });
+      setEstimatedRequiredLoanAmount(requiredLoan.required);
+      console.log('[PFJ] Estimated Required Loan Amount Updated:', requiredLoan.required);
+    } else {
+      console.warn('[PFJ] Could not recalculate estimated required loan - missing state or deposit details');
+    }
+  }, [selectedProperty, depositDetails, isFirstHomeBuyer, loanPurpose]); // Add dependencies
 
   // Handler for applying/removing affordability improvement suggestions
   const handleApplySuggestion = useCallback((scenario: ImprovementScenario) => {
@@ -595,23 +625,26 @@ export const PropertyFinanceJourney: React.FC<PropertyFinanceJourneyProps> = ({ 
     const displayPropertyValue = currentSliderPropertyValue ?? initialDisplayPropertyValue;
     console.log(`[calculateVisualisationState] Using Property Value for Calculation: ${formatCurrency(displayPropertyValue)}`);
 
-    // --- Calculate Loan Amount (Constrained) ---
+    // --- Calculate Costs & Available Deposit based on Savings ---
     const displayCosts = depositService.calculateDepositComponents(displayPropertyValue, selectedProperty.address.state, isFirstHomeBuyer, loanPurpose === 'INVESTMENT');
-    const calculatedDeposit = Math.max(0, Math.min(depositDetails.savings - (displayCosts.stampDuty + displayCosts.legalFees + displayCosts.otherUpfrontCosts), displayPropertyValue));
-    let calculatedLoanAmount = Math.max(0, displayPropertyValue - calculatedDeposit);
-    calculatedLoanAmount = Math.min(calculatedLoanAmount, maxBorrowingPower);
-    console.log(`[calculateVisualisationState] Display Loan Amount: ${formatCurrency(calculatedLoanAmount)}`);
+    const availableDeposit = Math.max(0, depositDetails.savings - (displayCosts.stampDuty + displayCosts.legalFees + displayCosts.otherUpfrontCosts));
+    console.log(`[calculateVisualisationState] Available Deposit (Savings - Costs): ${formatCurrency(availableDeposit)}`);
 
-    // --- Calculate Other Display Values ---
-    const displayDeposit = Math.max(0, displayPropertyValue - calculatedLoanAmount - displayCosts.stampDuty - displayCosts.legalFees - displayCosts.otherUpfrontCosts);
+    // --- Calculate Loan Amount (Required vs Max Borrow) ---
+    const requiredLoanAmountForDisplay = Math.max(0, displayPropertyValue - availableDeposit);
+    const finalLoanAmount = Math.min(requiredLoanAmountForDisplay, maxBorrowingPower);
+    console.log(`[calculateVisualisationState] Required Loan: ${formatCurrency(requiredLoanAmountForDisplay)}, Max Borrow: ${formatCurrency(maxBorrowingPower)}, Final Loan: ${formatCurrency(finalLoanAmount)}`);
+
+    // --- Set Final Display Values ---
+    const displayDeposit = availableDeposit; // Display deposit based on savings
     const displayStampDuty = displayCosts.stampDuty;
     const displayUpfrontCosts = displayCosts.legalFees + displayCosts.otherUpfrontCosts;
-    const displayLvr = displayPropertyValue > 0 ? (calculatedLoanAmount / displayPropertyValue) * 100 : 0;
+    const displayLvr = displayPropertyValue > 0 ? (finalLoanAmount / displayPropertyValue) * 100 : 0;
 
     // --- Get Product Details ---
     const displayProductDetails = getProductForLvr(
         displayLvr / 100,
-        calculatedLoanAmount,
+        finalLoanAmount,
         loanPurpose === 'INVESTMENT',
         loanPreferences.interestOnlyTerm ? loanPreferences.interestOnlyTerm > 0 : false,
         loanPreferences.interestRateType === 'FIXED',
@@ -622,7 +655,7 @@ export const PropertyFinanceJourney: React.FC<PropertyFinanceJourneyProps> = ({ 
 
     // --- Calculate Repayment ---
     const displayMonthlyRepayment = calculateMonthlyRepayment(
-        calculatedLoanAmount,
+        finalLoanAmount,
         displayProductDetails?.interestRate, // Pass rate directly
         loanPreferences.loanTerm || 30
     );
@@ -634,8 +667,8 @@ export const PropertyFinanceJourney: React.FC<PropertyFinanceJourneyProps> = ({ 
 
     return {
       displayPropertyValue,
-      displayLoanAmount: calculatedLoanAmount,
-      displayDeposit,
+      displayLoanAmount: finalLoanAmount, // Use the potentially capped loan amount
+      displayDeposit, // Use the deposit calculated from savings
       displayStampDuty,
       displayUpfrontCosts,
       displayLvr,
@@ -758,7 +791,10 @@ export const PropertyFinanceJourney: React.FC<PropertyFinanceJourneyProps> = ({ 
       <Box mt={4}>
         <Grid container spacing={3}>
           <Grid item xs={12} md={6}>
-            <PurchaseCosts />
+            <PurchaseCosts 
+              // Pass the new callback handler
+              onCostsChange={handlePurchaseCostsChange}
+            />
           </Grid>
           <Grid item xs={12} md={6} sx={{
             display: 'flex',
@@ -809,7 +845,8 @@ export const PropertyFinanceJourney: React.FC<PropertyFinanceJourneyProps> = ({ 
             propertyPostcode={selectedProperty.address.postcode}
             isFirstHomeBuyer={isFirstHomeBuyer}
             isInvestmentProperty={loanPurpose === 'INVESTMENT'}
-            requiredLoanAmount={loanAmount?.required || 0} // Keep for alert message context
+            // Pass the specifically calculated required loan for the estimate to the info box context
+            requiredLoanAmount={estimatedRequiredLoanAmount ?? loanAmount?.required ?? 0}
             maxBorrowingPower={maxBorrowingPower} // Keep for alert message context
             financials={financials} // Keep for suggestions
             maxBorrowResult={maxBorrowResult} // Keep for suggestions

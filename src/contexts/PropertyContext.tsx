@@ -71,7 +71,7 @@ const getDefaultPropertyDetails = (): PropertyDetails => {
 
 const getDefaultDepositDetails = (): DepositDetails => {
   return {
-    savings: 200000,
+    savings: 400000,
     depositAmount: 160000,
     stampDuty: 32000,
     otherCosts: 3000,
